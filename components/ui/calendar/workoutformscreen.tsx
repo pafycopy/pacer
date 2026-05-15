@@ -1,0 +1,366 @@
+import React, { useState, ReactNode } from 'react';
+import {
+  View, Text, TextInput, TouchableOpacity,
+  StyleSheet, ScrollView, SafeAreaView,
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import {
+  getFormConfig, WorkoutField,
+  calcEstimatedTime, calcIntervalTime,
+} from '@/constants/workoutformconfig';
+
+type WorkoutCategory = {
+  id: number;
+  label: string;
+  icon: ReactNode;
+  iconBg: string;
+};
+
+export type WorkoutFormValues = {
+  workoutType: string;
+  workoutName: string;
+  distance: string;
+  pace: string;
+  sets: string;
+  reps: string;
+  weight: string;
+  duration: { hour: number; min: number; sec: number };
+  notes: string;
+  warmup?: { distance: string; pace: string };
+  tempo?: { distance: string; targetPace: string; actualPace: string };
+  cooldown?: { distance: string; pace: string };
+  trainingCategory?: string;
+  selectedExercises?: Array<{
+    id: string;
+    name: string;
+    sets: Array<{ set: number; reps: string; kg: string }>;
+  }>;
+};
+
+export type Props = {
+  workout: WorkoutCategory;
+  initialValues?: WorkoutFormValues;
+  onBack: () => void;
+  onSave: (values: WorkoutFormValues) => void;
+};
+
+type ValidationErrors = Partial<Record<WorkoutField, string>>;
+
+const makeDefault = (workoutType: string): WorkoutFormValues => ({
+  workoutType,
+  workoutName: `${workoutType} Session`,
+  distance: '',
+  pace: '',
+  sets: '',
+  reps: '',
+  weight: '',
+  duration: { hour: 0, min: 0, sec: 0 },
+  notes: '',
+});
+
+const FieldLabel = ({ text }: { text: string }) => (
+  <Text style={styles.fieldLabel}>{text}</Text>
+);
+
+const FieldError = ({ message }: { message?: string }) =>
+  message ? <Text style={styles.errorText}>{message}</Text> : null;
+
+const TimeSpinner = ({
+  value, onChange, label, max = 99,
+}: {
+  value: number; onChange: (v: number) => void; label: string; max?: number;
+}) => (
+  <View style={styles.spinnerCol}>
+    <TouchableOpacity style={styles.spinnerBtn} onPress={() => onChange(Math.min(max, value + 1))}>
+      <Ionicons name="chevron-up" size={16} color="#444" />
+    </TouchableOpacity>
+    <View style={styles.spinnerValueBox}>
+      <Text style={styles.spinnerValue}>{String(value).padStart(2, '0')}</Text>
+    </View>
+    <TouchableOpacity style={styles.spinnerBtn} onPress={() => onChange(Math.max(0, value - 1))}>
+      <Ionicons name="chevron-down" size={16} color="#444" />
+    </TouchableOpacity>
+    <Text style={styles.spinnerLabel}>{label}</Text>
+  </View>
+);
+
+const validate = (values: WorkoutFormValues, fields: WorkoutField[]): ValidationErrors => {
+  const errors: ValidationErrors = {};
+  if (fields.includes('distance')) {
+    const d = parseFloat(values.distance);
+    if (!values.distance || isNaN(d) || d <= 0) errors.distance = 'Distance harus lebih dari 0';
+  }
+  if (fields.includes('pace')) {
+    const p = parseFloat(values.pace);
+    if (!values.pace || isNaN(p) || p <= 0) errors.pace = 'Pace harus lebih dari 0';
+  }
+  if (fields.includes('sets')) {
+    const s = parseInt(values.sets);
+    if (!values.sets || isNaN(s) || s <= 0) errors.sets = 'Sets harus lebih dari 0';
+  }
+  if (fields.includes('reps')) {
+    const r = parseInt(values.reps);
+    if (!values.reps || isNaN(r) || r <= 0) errors.reps = 'Reps harus lebih dari 0';
+  }
+  if (fields.includes('duration')) {
+    const total = values.duration.hour * 3600 + values.duration.min * 60 + values.duration.sec;
+    if (total === 0) errors.duration = 'Duration tidak boleh 0';
+  }
+  return errors;
+};
+
+export default function WorkoutFormScreen({ workout, initialValues, onBack, onSave }: Props) {
+  const config = getFormConfig(workout.label);
+  const isEditing = !!initialValues;
+
+  const [values, setValues] = useState<WorkoutFormValues>(
+    initialValues ?? makeDefault(workout.label)
+  );
+  const [errors, setErrors] = useState<ValidationErrors>({});
+  const [submitted, setSubmitted] = useState(false);
+
+  const update = <K extends keyof WorkoutFormValues>(field: K, value: WorkoutFormValues[K]) => {
+    setValues((prev) => {
+      const next = { ...prev, [field]: value };
+      if (submitted) setErrors(validate(next, config.fields));
+      return next;
+    });
+  };
+
+  const handleSubmit = () => {
+    setSubmitted(true);
+    const errs = validate(values, config.fields);
+    if (Object.keys(errs).length > 0) { setErrors(errs); return; }
+    onSave(values);
+  };
+
+  const has = (field: WorkoutField) => config.fields.includes(field);
+
+  const estimatedTime = has('distance') && has('pace')
+    ? config.workoutType === 'Interval Run'
+      ? calcIntervalTime(values.distance, values.pace, values.sets, config.distanceUnit)
+      : calcEstimatedTime(values.distance, values.pace, config.distanceUnit)
+    : null;
+
+  return (
+    <SafeAreaView style={styles.safeArea}>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={onBack} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <Ionicons name="arrow-back" size={22} color="#1A1A2E" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>{workout.label.toUpperCase()}</Text>
+        <View style={{ width: 22 }} />
+      </View>
+
+      <ScrollView
+        contentContainerStyle={styles.form}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        {has('distance') && (
+          <View style={styles.fieldGroup}>
+            <FieldLabel text="DISTANCE" />
+            <View style={[styles.inputRow, errors.distance && styles.inputError]}>
+              <TextInput
+                style={styles.input}
+                keyboardType="decimal-pad"
+                placeholder="0.00"
+                placeholderTextColor="#BBB"
+                value={values.distance}
+                onChangeText={(v) => update('distance', v)}
+              />
+              <Text style={styles.unit}>{config.distanceUnit ?? 'km'}</Text>
+            </View>
+            <FieldError message={errors.distance} />
+          </View>
+        )}
+
+        {has('pace') && (
+          <View style={styles.fieldGroup}>
+            <FieldLabel text="AVG PACE" />
+            <View style={[styles.inputRow, errors.pace && styles.inputError]}>
+              <TextInput
+                style={styles.input}
+                keyboardType="decimal-pad"
+                placeholder="0.00"
+                placeholderTextColor="#BBB"
+                value={values.pace}
+                onChangeText={(v) => update('pace', v)}
+              />
+              <Text style={styles.unit}>{config.paceUnit ?? '/km'}</Text>
+            </View>
+            <FieldError message={errors.pace} />
+          </View>
+        )}
+
+        {has('sets') && (
+          <View style={styles.row}>
+            <View style={[styles.fieldGroup, { flex: 1 }]}>
+              <FieldLabel text="SETS" />
+              <View style={[styles.inputRow, errors.sets && styles.inputError]}>
+                <TextInput
+                  style={styles.input}
+                  keyboardType="number-pad"
+                  placeholder="0"
+                  placeholderTextColor="#BBB"
+                  value={values.sets}
+                  onChangeText={(v) => update('sets', v)}
+                />
+              </View>
+              <FieldError message={errors.sets} />
+            </View>
+
+            {has('reps') && (
+              <View style={[styles.fieldGroup, { flex: 1 }]}>
+                <FieldLabel text="REPS" />
+                <View style={[styles.inputRow, errors.reps && styles.inputError]}>
+                  <TextInput
+                    style={styles.input}
+                    keyboardType="number-pad"
+                    placeholder="0"
+                    placeholderTextColor="#BBB"
+                    value={values.reps}
+                    onChangeText={(v) => update('reps', v)}
+                  />
+                </View>
+                <FieldError message={errors.reps} />
+              </View>
+            )}
+
+            {has('weight') && (
+              <View style={[styles.fieldGroup, { flex: 1 }]}>
+                <FieldLabel text="WEIGHT" />
+                <View style={styles.inputRow}>
+                  <TextInput
+                    style={styles.input}
+                    keyboardType="decimal-pad"
+                    placeholder="0"
+                    placeholderTextColor="#BBB"
+                    value={values.weight}
+                    onChangeText={(v) => update('weight', v)}
+                  />
+                  <Text style={styles.unit}>kg</Text>
+                </View>
+              </View>
+            )}
+          </View>
+        )}
+
+        {estimatedTime && estimatedTime !== '--' && (
+          <View style={styles.estTimeBox}>
+            <View>
+              <Text style={styles.estTimeLabel}>EST. TIME</Text>
+              <Text style={styles.estTimeValue}>{estimatedTime}</Text>
+            </View>
+            <Text style={styles.estTimeInfo}>
+              {config.workoutType === 'Interval Run'
+                ? `Dihitung otomatis\ndari jarak × pace × sets`
+                : `Dihitung otomatis\ndari jarak × pace`}
+            </Text>
+          </View>
+        )}
+
+        {has('duration') && (
+          <View style={styles.fieldGroup}>
+            <FieldLabel text="DURATION" />
+            <View style={styles.spinnerRow}>
+              <TimeSpinner
+                value={values.duration.hour}
+                onChange={(v) => update('duration', { ...values.duration, hour: v })}
+                label="HOUR"
+              />
+              <TimeSpinner
+                value={values.duration.min}
+                onChange={(v) => update('duration', { ...values.duration, min: v })}
+                label="MIN" max={59}
+              />
+              <TimeSpinner
+                value={values.duration.sec}
+                onChange={(v) => update('duration', { ...values.duration, sec: v })}
+                label="SEC" max={59}
+              />
+            </View>
+            <FieldError message={errors.duration} />
+          </View>
+        )}
+
+        {has('notes') && (
+          <View style={styles.fieldGroup}>
+            <FieldLabel text="NOTES" />
+            <TextInput
+              style={styles.textArea}
+              placeholder={config.notesPlaceholder ?? 'Tambahkan catatan...'}
+              placeholderTextColor="#BBB"
+              multiline
+              numberOfLines={4}
+              value={values.notes}
+              onChangeText={(v) => update('notes', v)}
+            />
+          </View>
+        )}
+      </ScrollView>
+
+      <View style={styles.footer}>
+        <TouchableOpacity style={styles.saveButton} onPress={handleSubmit} activeOpacity={0.85}>
+          <Ionicons name="save-outline" size={18} color="#fff" />
+          <Text style={styles.saveButtonText}>
+            {isEditing ? 'Simpan Perubahan' : 'Simpan Latihan'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: '#FFFFFF' },
+  header: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 20, paddingVertical: 14,
+    borderBottomWidth: 1, borderBottomColor: '#F0F0F0',
+  },
+  headerTitle: { fontSize: 16, fontWeight: '700', color: '#1A1A2E', letterSpacing: 1 },
+  form: { padding: 20, gap: 24, paddingBottom: 32 },
+  fieldGroup: { gap: 8 },
+  fieldLabel: { fontSize: 11, fontWeight: '700', color: '#999', letterSpacing: 0.8 },
+  row: { flexDirection: 'row', gap: 12 },
+  inputRow: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: '#F4F4F4', borderRadius: 12, paddingHorizontal: 16,
+    borderWidth: 1.5, borderColor: 'transparent',
+  },
+  inputError: { borderColor: '#FF3B30' },
+  input: { flex: 1, fontSize: 18, fontWeight: '600', color: '#1A1A2E', paddingVertical: 14 },
+  unit: { fontSize: 14, fontWeight: '600', color: '#999' },
+  errorText: { fontSize: 12, color: '#FF3B30', marginTop: 2 },
+  estTimeBox: {
+    backgroundColor: '#F0FFF4', borderRadius: 12, padding: 16,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    borderWidth: 1, borderColor: '#C8F5C8',
+  },
+  estTimeLabel: { fontSize: 11, fontWeight: '700', color: '#2E7D32', letterSpacing: 0.8 },
+  estTimeValue: { fontSize: 22, fontWeight: '800', color: '#1A1A2E', marginTop: 2 },
+  estTimeInfo: { fontSize: 11, color: '#2E7D32', textAlign: 'right', lineHeight: 16 },
+  spinnerRow: { flexDirection: 'row', gap: 12 },
+  spinnerCol: { alignItems: 'center', gap: 4 },
+  spinnerBtn: {
+    width: 44, height: 32, backgroundColor: '#F4F4F4',
+    borderRadius: 8, alignItems: 'center', justifyContent: 'center',
+  },
+  spinnerValueBox: {
+    width: 44, height: 40, backgroundColor: '#F4F4F4',
+    borderRadius: 8, alignItems: 'center', justifyContent: 'center',
+  },
+  spinnerValue: { fontSize: 18, fontWeight: '700', color: '#1A1A2E' },
+  spinnerLabel: { fontSize: 10, fontWeight: '600', color: '#AAA', letterSpacing: 0.5, marginTop: 2 },
+  textArea: {
+    backgroundColor: '#F4F4F4', borderRadius: 12, padding: 14,
+    fontSize: 14, color: '#1A1A2E', minHeight: 100, textAlignVertical: 'top',
+  },
+  footer: { padding: 20, paddingBottom: 28 },
+  saveButton: {
+    backgroundColor: '#2E7D32', borderRadius: 50, paddingVertical: 16,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+  },
+  saveButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
+});

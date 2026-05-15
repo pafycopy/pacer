@@ -1,0 +1,482 @@
+import React, { useState, useRef } from 'react';
+import {
+  View, Text, TouchableOpacity, StyleSheet,
+  Modal, TouchableWithoutFeedback,
+} from 'react-native';
+import type { View as RNView } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+
+
+
+
+type WorkoutStat = {
+  label: string;
+  value: string;
+};
+
+type PaceResult = {
+  targetPace: string;
+  actualPace: string;
+  targetDistance: string;
+  actualDistance: number;
+};
+
+type TempoPhaseResult = {
+  label: string;
+  targetDistance: string;
+  actualDistance: number;
+  targetPace: string;
+  actualPace: string;
+};
+
+type TempoResult = {
+  phases: TempoPhaseResult[];
+};
+
+type TodayWorkoutCardProps = {
+  workoutType?: string;
+  workoutName?: string;
+  stats?: WorkoutStat[];
+  status?: 'planned' | 'completed';
+  paceResult?: PaceResult;
+  tempoResult?: TempoResult;
+  onStartPress?: () => void;
+  onEdit?: () => void;
+  onDelete?: () => void;
+  isEmpty?: boolean;
+};
+
+const compareResult = (result: PaceResult): {
+  hit: boolean;
+  paceHit: boolean;
+  distanceHit: boolean;
+  paceDiff: string;
+  distanceDiff: string;
+} => {
+  const targetMin = parseFloat(result.targetPace);
+  const parts = result.actualPace.split(':');
+  const paceValid = !isNaN(targetMin) && parts.length === 2 && result.actualPace !== '--:--';
+
+  let paceHit = false;
+  let paceDiff = '-';
+
+  if (paceValid) {
+    const targetSec = targetMin * 60;
+    const actualSec = parseInt(parts[0]) * 60 + parseInt(parts[1]);
+    const diffSec = Math.abs(actualSec - targetSec);
+    const diffMin = Math.floor(diffSec / 60);
+    const diffSecRem = Math.round(diffSec % 60);
+    paceDiff = `${diffMin}:${diffSecRem < 10 ? '0' : ''}${diffSecRem}`;
+    paceHit = actualSec <= targetSec;
+  }
+
+  const targetDist = parseFloat(result.targetDistance);
+  const distanceValid = !isNaN(targetDist) && targetDist > 0;
+
+  let distanceHit = false;
+  let distanceDiff = '-';
+
+  if (distanceValid) {
+    const diff = result.actualDistance - targetDist;
+    distanceDiff = Math.abs(diff).toFixed(2);
+    distanceHit = result.actualDistance >= targetDist;
+  }
+
+  return { hit: paceHit && distanceHit, paceHit, distanceHit, paceDiff, distanceDiff };
+};
+
+const formatTargetPace = (pace: string): string => {
+  const p = parseFloat(pace);
+  if (isNaN(p)) return `${pace}/km`;
+  const m = Math.floor(p);
+  const s = Math.round((p - m) * 60);
+  return `${m}:${s < 10 ? '0' : ''}${s}/km`;
+};
+
+// Reusable comparison rows
+const ComparisonBox = ({
+  comparison, targetPace, actualPace, targetDistance, actualDistance,
+}: {
+  comparison: ReturnType<typeof compareResult>;
+  targetPace: string;
+  actualPace: string;
+  targetDistance: string;
+  actualDistance: number;
+}) => (
+  <View style={[
+    styles.paceCompareBox,
+    { backgroundColor: comparison.hit ? '#F0FFF4' : '#FFF5F5' },
+  ]}>
+    <View style={styles.paceCompareRow}>
+      <Ionicons
+        name={comparison.hit ? 'checkmark-circle' : 'close-circle'}
+        size={20}
+        color={comparison.hit ? '#2E7D32' : '#FF3B30'}
+      />
+      <Text style={[styles.paceCompareTitle, { color: comparison.hit ? '#2E7D32' : '#FF3B30' }]}>
+        {comparison.hit ? 'Semua Target Tercapai!' : 'Target Belum Tercapai'}
+      </Text>
+    </View>
+
+    {/* Pace Row */}
+    <View style={styles.paceCheckRow}>
+      <Ionicons
+        name={comparison.paceHit ? 'checkmark-circle' : 'close-circle'}
+        size={13} color={comparison.paceHit ? '#2E7D32' : '#FF3B30'}
+      />
+      <Text style={styles.paceCheckLabel}>PACE</Text>
+      <Text style={styles.paceCheckTarget}>{formatTargetPace(targetPace)}</Text>
+      <Ionicons name="arrow-forward" size={11} color="#AAA" />
+      <Text style={[styles.paceCheckActual, { color: comparison.paceHit ? '#2E7D32' : '#FF3B30' }]}>
+        {actualPace}/km
+      </Text>
+      {!comparison.paceHit && comparison.paceDiff !== '-' && (
+        <View style={styles.diffBadge}>
+          <Text style={styles.diffBadgeText}>+{comparison.paceDiff}</Text>
+        </View>
+      )}
+    </View>
+
+    {/* Distance Row */}
+    <View style={styles.paceCheckRow}>
+      <Ionicons
+        name={comparison.distanceHit ? 'checkmark-circle' : 'close-circle'}
+        size={13} color={comparison.distanceHit ? '#2E7D32' : '#FF3B30'}
+      />
+      <Text style={styles.paceCheckLabel}>JARAK</Text>
+      <Text style={styles.paceCheckTarget}>{targetDistance} km</Text>
+      <Ionicons name="arrow-forward" size={11} color="#AAA" />
+      <Text style={[styles.paceCheckActual, { color: comparison.distanceHit ? '#2E7D32' : '#FF3B30' }]}>
+        {actualDistance.toFixed(2)} km
+      </Text>
+      <View style={[styles.diffBadge, { backgroundColor: comparison.distanceHit ? '#E8F5E9' : '#FFE8E8' }]}>
+        <Text style={[styles.diffBadgeText, { color: comparison.distanceHit ? '#2E7D32' : '#FF3B30' }]}>
+          {comparison.distanceHit ? '+' : '-'}{comparison.distanceDiff} km
+        </Text>
+      </View>
+    </View>
+  </View>
+);
+
+export default function TodayWorkoutCard({
+  workoutType = 'EASY RUN',
+  workoutName = 'Workout Session',
+  stats = [],
+  status = 'planned',
+  paceResult,
+  tempoResult,
+  onStartPress,
+  onEdit,
+  onDelete,
+  isEmpty = false,
+}: TodayWorkoutCardProps) {
+  const [menuVisible, setMenuVisible] = useState(false);
+  const [menuPosition, setMenuPosition] = useState({ top: 0, right: 0 });
+  const menuBtnRef = useRef<RNView>(null);
+
+  const handleMenuPress = () => {
+    menuBtnRef.current?.measure((_fx: number, _fy: number, _w: number, _h: number, px: number, py: number) => {
+      setMenuPosition({ top: py + _h + 4, right: 16 });
+      setMenuVisible(true);
+    });
+  };
+
+  const handleEdit = () => { setMenuVisible(false); onEdit?.(); };
+  const handleDelete = () => { setMenuVisible(false); onDelete?.(); };
+
+  const isCompleted = status === 'completed';
+  const paceComparison = paceResult ? compareResult(paceResult) : null;
+
+  const PHASE_COLORS = ['#FF9500', '#2E7D32', '#007AFF'];
+
+  if (isEmpty) {
+    return (
+      <View style={styles.emptyCard}>
+        <View style={styles.emptyIcon}>
+          <Text style={styles.emptyIconText}>?</Text>
+        </View>
+        <Text style={styles.emptyText}>Belum tersedia{'\n'}jadwal latihan</Text>
+      </View>
+    );
+  }
+
+  return (
+    <>
+      <View style={[styles.card, isCompleted && styles.cardCompleted]}>
+        {/* Header */}
+        <View style={styles.cardHeader}>
+          <View style={styles.workoutTypeBadge}>
+            <Text style={styles.workoutTypeIcon}>🏃</Text>
+            <Text style={styles.workoutTypeText}>{workoutType}</Text>
+          </View>
+          <View style={styles.headerRight}>
+            {isCompleted && (
+              <View style={styles.completedBadge}>
+                <Ionicons name="checkmark-circle" size={12} color="#2E7D32" />
+                <Text style={styles.completedBadgeText}>Selesai</Text>
+              </View>
+            )}
+            <View ref={menuBtnRef}>
+              <TouchableOpacity
+                onPress={handleMenuPress}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Text style={styles.menuDots}>•••</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+
+        {/* Workout Name */}
+        <Text style={styles.workoutName}>{workoutName}</Text>
+
+        {/* Stats */}
+        <View style={styles.statsRow}>
+          {stats.map((stat, index) => (
+            <View key={index} style={styles.statItem}>
+              <Text style={styles.statLabel}>{stat.label}</Text>
+              <Text style={styles.statValue}>{stat.value}</Text>
+            </View>
+          ))}
+        </View>
+
+        {/* Easy/Long/Interval Run — 1 comparison box */}
+        {isCompleted && paceComparison && paceResult && (
+          <ComparisonBox
+            comparison={paceComparison}
+            targetPace={paceResult.targetPace}
+            actualPace={paceResult.actualPace}
+            targetDistance={paceResult.targetDistance}
+            actualDistance={paceResult.actualDistance}
+          />
+        )}
+
+        {/* Tempo Run — 3 comparison boxes per fase */}
+        {isCompleted && tempoResult && (
+          <View style={styles.tempoBox}>
+            {tempoResult.phases.map((phase, index) => {
+              const phaseComparison = compareResult({
+                targetPace: phase.targetPace,
+                actualPace: phase.actualPace,
+                targetDistance: phase.targetDistance,
+                actualDistance: phase.actualDistance,
+              });
+              const phaseColor = PHASE_COLORS[index];
+
+              return (
+                <View key={index} style={[styles.tempoPhase, { borderLeftColor: phaseColor }]}>
+                  {/* Phase Header */}
+                  <View style={styles.tempoPhaseHeader}>
+                    <Text style={[styles.tempoPhaseLabel, { color: phaseColor }]}>
+                      {phase.label}
+                    </Text>
+                    <View style={[
+                      styles.phaseStatusBadge,
+                      { backgroundColor: phaseComparison.hit ? '#F0FFF4' : '#FFF5F5' },
+                    ]}>
+                      <Ionicons
+                        name={phaseComparison.hit ? 'checkmark-circle' : 'close-circle'}
+                        size={12}
+                        color={phaseComparison.hit ? '#2E7D32' : '#FF3B30'}
+                      />
+                      <Text style={[
+                        styles.phaseStatusText,
+                        { color: phaseComparison.hit ? '#2E7D32' : '#FF3B30' },
+                      ]}>
+                        {phaseComparison.hit ? 'Tercapai' : 'Belum'}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Pace */}
+                  <View style={styles.paceCheckRow}>
+                    <Ionicons
+                      name={phaseComparison.paceHit ? 'checkmark-circle' : 'close-circle'}
+                      size={13} color={phaseComparison.paceHit ? '#2E7D32' : '#FF3B30'}
+                    />
+                    <Text style={styles.paceCheckLabel}>PACE</Text>
+                    <Text style={styles.paceCheckTarget}>{formatTargetPace(phase.targetPace)}</Text>
+                    <Ionicons name="arrow-forward" size={11} color="#AAA" />
+                    <Text style={[styles.paceCheckActual, { color: phaseComparison.paceHit ? '#2E7D32' : '#FF3B30' }]}>
+                      {phase.actualPace}/km
+                    </Text>
+                    {!phaseComparison.paceHit && phaseComparison.paceDiff !== '-' && (
+                      <View style={styles.diffBadge}>
+                        <Text style={styles.diffBadgeText}>+{phaseComparison.paceDiff}</Text>
+                      </View>
+                    )}
+                  </View>
+
+                  {/* Distance */}
+                  <View style={styles.paceCheckRow}>
+                    <Ionicons
+                      name={phaseComparison.distanceHit ? 'checkmark-circle' : 'close-circle'}
+                      size={13} color={phaseComparison.distanceHit ? '#2E7D32' : '#FF3B30'}
+                    />
+                    <Text style={styles.paceCheckLabel}>JARAK</Text>
+                    <Text style={styles.paceCheckTarget}>{phase.targetDistance} km</Text>
+                    <Ionicons name="arrow-forward" size={11} color="#AAA" />
+                    <Text style={[styles.paceCheckActual, { color: phaseComparison.distanceHit ? '#2E7D32' : '#FF3B30' }]}>
+                      {phase.actualDistance.toFixed(2)} km
+                    </Text>
+                    <View style={[styles.diffBadge, { backgroundColor: phaseComparison.distanceHit ? '#E8F5E9' : '#FFE8E8' }]}>
+                      <Text style={[styles.diffBadgeText, { color: phaseComparison.distanceHit ? '#2E7D32' : '#FF3B30' }]}>
+                        {phaseComparison.distanceHit ? '+' : '-'}{phaseComparison.distanceDiff} km
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        )}
+
+        {/* Button */}
+        {isCompleted ? (
+          <View style={styles.completedBtn}>
+            <Ionicons name="checkmark-circle" size={18} color="#2E7D32" />
+            <Text style={styles.completedBtnText}>Latihan Selesai</Text>
+          </View>
+        ) : (
+          <TouchableOpacity style={styles.startButton} onPress={onStartPress} activeOpacity={0.85}>
+            <Text style={styles.startButtonIcon}>▶</Text>
+            <Text style={styles.startButtonText}>Start Running</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {/* Menu */}
+      <Modal
+        visible={menuVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setMenuVisible(false)}
+      >
+        <TouchableWithoutFeedback onPress={() => setMenuVisible(false)}>
+          <View style={styles.menuOverlay}>
+            <View style={[styles.menuBox, { top: menuPosition.top, right: menuPosition.right }]}>
+              {!isCompleted && (
+                <>
+                  <TouchableOpacity style={styles.menuItem} onPress={handleEdit}>
+                    <Ionicons name="pencil-outline" size={16} color="#1A1A2E" />
+                    <Text style={styles.menuItemText}>Edit</Text>
+                  </TouchableOpacity>
+                  <View style={styles.menuDivider} />
+                </>
+              )}
+              <TouchableOpacity style={styles.menuItem} onPress={handleDelete}>
+                <Ionicons name="trash-outline" size={16} color="#FF3B30" />
+                <Text style={[styles.menuItemText, { color: '#FF3B30' }]}>Hapus</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+    </>
+  );
+}
+
+const styles = StyleSheet.create({
+  emptyCard: {
+    backgroundColor: '#FFFFFF', borderRadius: 20, padding: 20,
+    flexDirection: 'row', alignItems: 'center', gap: 14,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05, shadowRadius: 10, elevation: 2,
+  },
+  emptyIcon: {
+    width: 44, height: 44, borderRadius: 22,
+    backgroundColor: '#F0F0F0', alignItems: 'center', justifyContent: 'center',
+  },
+  emptyIconText: { fontSize: 18, fontWeight: '700', color: '#AAAAAA' },
+  emptyText: { fontSize: 15, fontWeight: '600', color: '#1A1A2E', lineHeight: 22 },
+  card: {
+    backgroundColor: '#FFFFFF', borderRadius: 20, padding: 20,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.07, shadowRadius: 12, elevation: 3,
+  },
+  cardCompleted: { borderWidth: 1.5, borderColor: '#C8F5C8' },
+  cardHeader: {
+    flexDirection: 'row', justifyContent: 'space-between',
+    alignItems: 'center', marginBottom: 6,
+  },
+  workoutTypeBadge: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  workoutTypeIcon: { fontSize: 13 },
+  workoutTypeText: { fontSize: 12, fontWeight: '600', color: '#888', letterSpacing: 0.5 },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  completedBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: '#F0FFF4', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10,
+  },
+  completedBadgeText: { fontSize: 11, fontWeight: '600', color: '#2E7D32' },
+  menuDots: { fontSize: 14, color: '#888', letterSpacing: 1 },
+  workoutName: {
+    fontSize: 20, fontWeight: '700', color: '#1A1A2E',
+    marginBottom: 20, letterSpacing: -0.3,
+  },
+  statsRow: { flexDirection: 'row', gap: 28, marginBottom: 20, flexWrap: 'wrap' },
+  statItem: { gap: 4 },
+  statLabel: { fontSize: 11, fontWeight: '600', color: '#999', letterSpacing: 0.5 },
+  statValue: { fontSize: 16, fontWeight: '700', color: '#1A1A2E' },
+
+  // Pace Compare
+  paceCompareBox: {
+    borderRadius: 12, padding: 14, marginBottom: 16, gap: 10,
+  },
+  paceCompareRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
+  paceCompareTitle: { fontSize: 13, fontWeight: '700' },
+  paceCheckRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
+  paceCheckLabel: {
+    fontSize: 10, fontWeight: '700', color: '#AAA', letterSpacing: 0.5, width: 36,
+  },
+  paceCheckTarget: { fontSize: 13, fontWeight: '600', color: '#888' },
+  paceCheckActual: { fontSize: 13, fontWeight: '800' },
+  diffBadge: {
+    backgroundColor: '#FFE8E8', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6,
+  },
+  diffBadgeText: { fontSize: 11, fontWeight: '600', color: '#FF3B30' },
+
+  // Tempo
+  tempoBox: { gap: 10, marginBottom: 16 },
+  tempoPhase: {
+    backgroundColor: '#FAFAFA', borderRadius: 12,
+    padding: 12, gap: 8, borderLeftWidth: 3,
+  },
+  tempoPhaseHeader: {
+    flexDirection: 'row', alignItems: 'center',
+    justifyContent: 'space-between', marginBottom: 2,
+  },
+  tempoPhaseLabel: { fontSize: 12, fontWeight: '800', letterSpacing: 0.5 },
+  phaseStatusBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8,
+  },
+  phaseStatusText: { fontSize: 10, fontWeight: '700' },
+
+  // Buttons
+  startButton: {
+    backgroundColor: '#4CD964', borderRadius: 14, paddingVertical: 16,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+  },
+  startButtonIcon: { fontSize: 14, color: '#1A1A2E' },
+  startButtonText: { fontSize: 16, fontWeight: '700', color: '#1A1A2E', letterSpacing: 0.2 },
+  completedBtn: {
+    backgroundColor: '#F0FFF4', borderRadius: 14, paddingVertical: 16,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    borderWidth: 1, borderColor: '#C8F5C8',
+  },
+  completedBtnText: { fontSize: 16, fontWeight: '700', color: '#2E7D32' },
+  menuOverlay: { flex: 1 },
+  menuBox: {
+    position: 'absolute', backgroundColor: '#FFFFFF', borderRadius: 12,
+    paddingVertical: 4, minWidth: 140,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12, shadowRadius: 12, elevation: 8,
+    borderWidth: 1, borderColor: '#F0F0F0',
+  },
+  menuItem: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    paddingHorizontal: 16, paddingVertical: 12,
+  },
+  menuItemText: { fontSize: 14, fontWeight: '600', color: '#1A1A2E' },
+  menuDivider: { height: 0.5, backgroundColor: '#EEEEEE', marginHorizontal: 12 },
+});
