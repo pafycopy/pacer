@@ -13,15 +13,22 @@ import StrengthTrainingForm from '@/components/ui/calendar/strengthtrainingform'
 import { useWorkoutStore, toDateKey, SavedWorkout } from '@/store/workoutStore';
 import { resolveStats } from '@/utils/resolveWorkoutStats';
 
-const FORM_REGISTRY: Record<string, React.ComponentType<FormProps>> = {
-  'Tempo Run': TempoRunForm as React.ComponentType<FormProps>,
-  'Strength Training': StrengthTrainingForm as React.ComponentType<FormProps>,
+interface BaseFormProps {
+  workout: any;
+  initialValues?: any;
+  onBack: () => void;
+  onSave: (values: any) => void;
+}
+
+const FORM_REGISTRY: Record<string, React.ComponentType<BaseFormProps>> = {
+  'Tempo Run': TempoRunForm as React.ComponentType<BaseFormProps>,
+  'Strength Training': StrengthTrainingForm as React.ComponentType<BaseFormProps>,
 };
 
 const TRACKER_REGISTRY: Record<string, string> = {
   'Easy Run':          '/tracker/running',
   'Long Run':          '/tracker/running',
-  'Tempo Run':         '/tracker/tempo',    // ← tracker khusus
+  'Tempo Run':         '/tracker/tempo',
   'Interval Run':      '/tracker/interval',
   'Strength Training': '/tracker/strength',
 };
@@ -61,11 +68,14 @@ const training = () => {
 
   const handleEdit = (workout: SavedWorkout) => {
     setEditingWorkout(workout);
+    // Sekarang pakai iconName + iconLib (string) bukan ReactNode
     setSelectedWorkout({
       id: 0,
       label: workout.workoutType,
-      icon: '🏃',
+      iconName: 'directions-run',
+      iconLib: 'material',
       iconBg: '#E8E8E8',
+      icon: 'directions-run',
     });
     setFormVisible(true);
   };
@@ -86,24 +96,23 @@ const training = () => {
         workoutType: workout.workoutType,
         workoutName: workout.workoutName,
 
-        // Interval Run
         ...(workout.workoutType === 'Interval Run' && {
           distance: workout.distance,
           pace: workout.pace,
-          sets: workout.sets,
+          reps: workout.reps,
+          restTime: workout.restTime,
         }),
 
-        // Tempo Run — kirim data per fase
-        ...(workout.workoutType === 'Tempo Run' && workout.warmup && workout.tempo && workout.cooldown && {
-          warmupDistance:   workout.warmup.distance,
-          warmupPace:       workout.warmup.pace,
-          tempoDistance:    workout.tempo.distance,
-          targetPace:       workout.tempo.targetPace,
-          cooldownDistance: workout.cooldown.distance,
-          cooldownPace:     workout.cooldown.pace,
-        }),
+        ...(workout.workoutType === 'Tempo Run' &&
+          workout.warmup && workout.tempo && workout.cooldown && {
+            warmupDistance:   workout.warmup.distance,
+            warmupPace:       workout.warmup.pace,
+            tempoDistance:    workout.tempo.distance,
+            targetPace:       workout.tempo.targetPace,
+            cooldownDistance: workout.cooldown.distance,
+            cooldownPace:     workout.cooldown.pace,
+          }),
 
-        // Strength Training
         ...(workout.workoutType === 'Strength Training' && {
           selectedExercises: JSON.stringify(workout.selectedExercises ?? []),
         }),
@@ -112,7 +121,7 @@ const training = () => {
   };
 
   const ActiveForm = selectedWorkout
-    ? (FORM_REGISTRY[selectedWorkout.label] ?? WorkoutFormScreen)
+    ? ((FORM_REGISTRY[selectedWorkout.label] ?? WorkoutFormScreen) as React.ComponentType<FormProps>)
     : null;
 
   const isToday = selectedDate.toDateString() === new Date().toDateString();
@@ -146,12 +155,12 @@ const training = () => {
                 stats={resolveStats(workout)}
                 status={workout.status}
 
-                // Pace result — Easy/Long/Interval Run
                 paceResult={
                   workout.trackingResult &&
                   workout.pace &&
                   workout.distance &&
-                  workout.workoutType !== 'Tempo Run'
+                  workout.workoutType !== 'Tempo Run' &&
+                  workout.workoutType !== 'Interval Run'
                     ? {
                         targetPace: workout.pace,
                         actualPace: workout.trackingResult.actualPace,
@@ -161,13 +170,10 @@ const training = () => {
                     : undefined
                 }
 
-                // Tempo result — 3 fase dengan data akurat per fase
                 tempoResult={
                   workout.workoutType === 'Tempo Run' &&
                   workout.trackingResult?.phaseResults &&
-                  workout.warmup &&
-                  workout.tempo &&
-                  workout.cooldown
+                  workout.warmup && workout.tempo && workout.cooldown
                     ? {
                         phases: [
                           {
@@ -192,6 +198,17 @@ const training = () => {
                             actualPace: workout.trackingResult.phaseResults.cooldown.actualPace,
                           },
                         ],
+                      }
+                    : undefined
+                }
+
+                intervalResult={
+                  workout.workoutType === 'Interval Run' &&
+                  workout.trackingResult?.repResults
+                    ? {
+                        targetDistance: parseFloat(workout.distance ?? '0'),
+                        targetPace: workout.pace ?? '0',
+                        reps: workout.trackingResult.repResults,
                       }
                     : undefined
                 }

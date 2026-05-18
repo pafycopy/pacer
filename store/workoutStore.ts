@@ -25,7 +25,7 @@ export type TrackingResult = {
     tempo: PhaseResult;
     cooldown: PhaseResult;
   };
-  repResults?: RepResult[];  // ← hasil per rep untuk Interval Run
+  repResults?: RepResult[];
 };
 
 export type WorkoutStatus = 'planned' | 'completed';
@@ -48,13 +48,11 @@ export type SavedWorkout = WorkoutFormValues & {
 type WorkoutStore = {
   workoutsByDate: Record<string, SavedWorkout[]>;
   selectedDate: Date;
-
   setSelectedDate: (date: Date) => void;
   addWorkout: (dateKey: string, data: WorkoutFormValues) => void;
   updateWorkout: (dateKey: string, uid: string, data: WorkoutFormValues) => void;
   deleteWorkout: (dateKey: string, uid: string) => void;
   saveTrackingResult: (dateKey: string, uid: string, result: TrackingResult) => void;
-
   getWorkoutsByDate: (dateKey: string) => SavedWorkout[];
   getWorkoutDates: () => string[];
 };
@@ -104,9 +102,7 @@ export const useWorkoutStore = create<WorkoutStore>((set, get) => ({
       workoutsByDate: {
         ...state.workoutsByDate,
         [dateKey]: (state.workoutsByDate[dateKey] ?? []).map((w) =>
-          w.uid === uid
-            ? { ...w, trackingResult: result, status: 'completed' }
-            : w
+          w.uid === uid ? { ...w, trackingResult: result, status: 'completed' } : w
         ),
       },
     }));

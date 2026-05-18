@@ -1,4 +1,4 @@
-import React, { useState, ReactNode } from 'react';
+import React, { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
   StyleSheet, ScrollView, SafeAreaView,
@@ -8,11 +8,13 @@ import {
   getFormConfig, WorkoutField,
   calcEstimatedTime, calcIntervalTime,
 } from '@/constants/workoutformconfig';
+import TempoRunForm from '@/components/ui/calendar/temporunform';
+import StrengthTrainingForm from '@/components/ui/calendar/strengthtrainingform';
 
 type WorkoutCategory = {
   id: number;
   label: string;
-  icon: ReactNode;
+  icon: string;
   iconBg: string;
 };
 
@@ -23,6 +25,7 @@ export type WorkoutFormValues = {
   pace: string;
   sets: string;
   reps: string;
+  restTime: string;
   weight: string;
   duration: { hour: number; min: number; sec: number };
   notes: string;
@@ -53,6 +56,7 @@ const makeDefault = (workoutType: string): WorkoutFormValues => ({
   pace: '',
   sets: '',
   reps: '',
+  restTime: '90',
   weight: '',
   duration: { hour: 0, min: 0, sec: 0 },
   notes: '',
@@ -94,13 +98,17 @@ const validate = (values: WorkoutFormValues, fields: WorkoutField[]): Validation
     const p = parseFloat(values.pace);
     if (!values.pace || isNaN(p) || p <= 0) errors.pace = 'Pace harus lebih dari 0';
   }
-  if (fields.includes('sets')) {
-    const s = parseInt(values.sets);
-    if (!values.sets || isNaN(s) || s <= 0) errors.sets = 'Sets harus lebih dari 0';
-  }
   if (fields.includes('reps')) {
     const r = parseInt(values.reps);
     if (!values.reps || isNaN(r) || r <= 0) errors.reps = 'Reps harus lebih dari 0';
+  }
+  if (fields.includes('restTime')) {
+    const rt = parseInt(values.restTime);
+    if (!values.restTime || isNaN(rt) || rt <= 0) errors.restTime = 'Waktu rest harus lebih dari 0';
+  }
+  if (fields.includes('sets')) {
+    const s = parseInt(values.sets);
+    if (!values.sets || isNaN(s) || s <= 0) errors.sets = 'Sets harus lebih dari 0';
   }
   if (fields.includes('duration')) {
     const total = values.duration.hour * 3600 + values.duration.min * 60 + values.duration.sec;
@@ -109,7 +117,17 @@ const validate = (values: WorkoutFormValues, fields: WorkoutField[]): Validation
   return errors;
 };
 
+const FORM_REGISTRY: Partial<Record<string, React.ComponentType<any>>> = {
+  'Tempo Run': TempoRunForm,
+  'Strength Training': StrengthTrainingForm,
+};
+
 export default function WorkoutFormScreen({ workout, initialValues, onBack, onSave }: Props) {
+  const SpecialForm = FORM_REGISTRY[workout.label];
+  if (SpecialForm) {
+    return <SpecialForm initialValues={initialValues} onBack={onBack} onSave={onSave} />;
+  }
+
   const config = getFormConfig(workout.label);
   const isEditing = !!initialValues;
 
@@ -138,7 +156,7 @@ export default function WorkoutFormScreen({ workout, initialValues, onBack, onSa
 
   const estimatedTime = has('distance') && has('pace')
     ? config.workoutType === 'Interval Run'
-      ? calcIntervalTime(values.distance, values.pace, values.sets, config.distanceUnit)
+      ? calcIntervalTime(values.distance, values.pace, values.reps, config.distanceUnit)
       : calcEstimatedTime(values.distance, values.pace, config.distanceUnit)
     : null;
 
@@ -159,7 +177,7 @@ export default function WorkoutFormScreen({ workout, initialValues, onBack, onSa
       >
         {has('distance') && (
           <View style={styles.fieldGroup}>
-            <FieldLabel text="DISTANCE" />
+            <FieldLabel text={config.workoutType === 'Interval Run' ? 'JARAK PER INTERVAL' : 'DISTANCE'} />
             <View style={[styles.inputRow, errors.distance && styles.inputError]}>
               <TextInput
                 style={styles.input}
@@ -177,7 +195,7 @@ export default function WorkoutFormScreen({ workout, initialValues, onBack, onSa
 
         {has('pace') && (
           <View style={styles.fieldGroup}>
-            <FieldLabel text="AVG PACE" />
+            <FieldLabel text={config.workoutType === 'Interval Run' ? 'TARGET PACE' : 'AVG PACE'} />
             <View style={[styles.inputRow, errors.pace && styles.inputError]}>
               <TextInput
                 style={styles.input}
@@ -193,7 +211,59 @@ export default function WorkoutFormScreen({ workout, initialValues, onBack, onSa
           </View>
         )}
 
-        {has('sets') && (
+        {has('reps') && config.workoutType === 'Interval Run' && (
+          <View style={styles.row}>
+            <View style={[styles.fieldGroup, { flex: 1 }]}>
+              <FieldLabel text="REPETISI" />
+              <View style={[styles.inputRow, errors.reps && styles.inputError]}>
+                <TextInput
+                  style={styles.input}
+                  keyboardType="number-pad"
+                  placeholder="0"
+                  placeholderTextColor="#BBB"
+                  value={values.reps}
+                  onChangeText={(v) => update('reps', v)}
+                />
+                <Text style={styles.unit}>x</Text>
+              </View>
+              <FieldError message={errors.reps} />
+            </View>
+
+            {has('restTime') && (
+              <View style={[styles.fieldGroup, { flex: 1 }]}>
+                <FieldLabel text="WAKTU REST" />
+                <View style={[styles.inputRow, errors.restTime && styles.inputError]}>
+                  <TextInput
+                    style={styles.input}
+                    keyboardType="number-pad"
+                    placeholder="90"
+                    placeholderTextColor="#BBB"
+                    value={values.restTime}
+                    onChangeText={(v) => update('restTime', v)}
+                  />
+                  <Text style={styles.unit}>dtk</Text>
+                </View>
+                <FieldError message={errors.restTime} />
+              </View>
+            )}
+          </View>
+        )}
+
+        {estimatedTime && estimatedTime !== '--' && (
+          <View style={styles.estTimeBox}>
+            <View>
+              <Text style={styles.estTimeLabel}>EST. TIME</Text>
+              <Text style={styles.estTimeValue}>{estimatedTime}</Text>
+            </View>
+            <Text style={styles.estTimeInfo}>
+              {config.workoutType === 'Interval Run'
+                ? `Dihitung otomatis\ndari jarak × pace × reps`
+                : `Dihitung otomatis\ndari jarak × pace`}
+            </Text>
+          </View>
+        )}
+
+        {has('sets') && config.workoutType !== 'Interval Run' && (
           <View style={styles.row}>
             <View style={[styles.fieldGroup, { flex: 1 }]}>
               <FieldLabel text="SETS" />
@@ -209,24 +279,6 @@ export default function WorkoutFormScreen({ workout, initialValues, onBack, onSa
               </View>
               <FieldError message={errors.sets} />
             </View>
-
-            {has('reps') && (
-              <View style={[styles.fieldGroup, { flex: 1 }]}>
-                <FieldLabel text="REPS" />
-                <View style={[styles.inputRow, errors.reps && styles.inputError]}>
-                  <TextInput
-                    style={styles.input}
-                    keyboardType="number-pad"
-                    placeholder="0"
-                    placeholderTextColor="#BBB"
-                    value={values.reps}
-                    onChangeText={(v) => update('reps', v)}
-                  />
-                </View>
-                <FieldError message={errors.reps} />
-              </View>
-            )}
-
             {has('weight') && (
               <View style={[styles.fieldGroup, { flex: 1 }]}>
                 <FieldLabel text="WEIGHT" />
@@ -243,20 +295,6 @@ export default function WorkoutFormScreen({ workout, initialValues, onBack, onSa
                 </View>
               </View>
             )}
-          </View>
-        )}
-
-        {estimatedTime && estimatedTime !== '--' && (
-          <View style={styles.estTimeBox}>
-            <View>
-              <Text style={styles.estTimeLabel}>EST. TIME</Text>
-              <Text style={styles.estTimeValue}>{estimatedTime}</Text>
-            </View>
-            <Text style={styles.estTimeInfo}>
-              {config.workoutType === 'Interval Run'
-                ? `Dihitung otomatis\ndari jarak × pace × sets`
-                : `Dihitung otomatis\ndari jarak × pace`}
-            </Text>
           </View>
         )}
 

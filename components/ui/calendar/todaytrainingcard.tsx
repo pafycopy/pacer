@@ -6,9 +6,6 @@ import {
 import type { View as RNView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-
-
-
 type WorkoutStat = {
   label: string;
   value: string;
@@ -33,6 +30,20 @@ type TempoResult = {
   phases: TempoPhaseResult[];
 };
 
+type RepResult = {
+  rep: number;
+  distance: number;
+  duration: number;
+  pace: string;
+  hit: boolean;
+};
+
+type IntervalResult = {
+  targetDistance: number;
+  targetPace: string;
+  reps: RepResult[];
+};
+
 type TodayWorkoutCardProps = {
   workoutType?: string;
   workoutName?: string;
@@ -40,19 +51,14 @@ type TodayWorkoutCardProps = {
   status?: 'planned' | 'completed';
   paceResult?: PaceResult;
   tempoResult?: TempoResult;
+  intervalResult?: IntervalResult;
   onStartPress?: () => void;
   onEdit?: () => void;
   onDelete?: () => void;
   isEmpty?: boolean;
 };
 
-const compareResult = (result: PaceResult): {
-  hit: boolean;
-  paceHit: boolean;
-  distanceHit: boolean;
-  paceDiff: string;
-  distanceDiff: string;
-} => {
+const compareResult = (result: PaceResult) => {
   const targetMin = parseFloat(result.targetPace);
   const parts = result.actualPace.split(':');
   const paceValid = !isNaN(targetMin) && parts.length === 2 && result.actualPace !== '--:--';
@@ -71,14 +77,11 @@ const compareResult = (result: PaceResult): {
   }
 
   const targetDist = parseFloat(result.targetDistance);
-  const distanceValid = !isNaN(targetDist) && targetDist > 0;
-
   let distanceHit = false;
   let distanceDiff = '-';
 
-  if (distanceValid) {
-    const diff = result.actualDistance - targetDist;
-    distanceDiff = Math.abs(diff).toFixed(2);
+  if (!isNaN(targetDist) && targetDist > 0) {
+    distanceDiff = Math.abs(result.actualDistance - targetDist).toFixed(2);
     distanceHit = result.actualDistance >= targetDist;
   }
 
@@ -93,37 +96,35 @@ const formatTargetPace = (pace: string): string => {
   return `${m}:${s < 10 ? '0' : ''}${s}/km`;
 };
 
-// Reusable comparison rows
-const ComparisonBox = ({
-  comparison, targetPace, actualPace, targetDistance, actualDistance,
-}: {
+const formatDuration = (sec: number): string => {
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return `${m}:${String(s).padStart(2, '0')}`;
+};
+
+type ComparisonBoxProps = {
   comparison: ReturnType<typeof compareResult>;
   targetPace: string;
   actualPace: string;
   targetDistance: string;
   actualDistance: number;
-}) => (
-  <View style={[
-    styles.paceCompareBox,
-    { backgroundColor: comparison.hit ? '#F0FFF4' : '#FFF5F5' },
-  ]}>
+};
+
+const ComparisonBox = ({ comparison, targetPace, actualPace, targetDistance, actualDistance }: ComparisonBoxProps) => (
+  <View style={[styles.paceCompareBox, { backgroundColor: comparison.hit ? '#F0FFF4' : '#FFF5F5' }]}>
     <View style={styles.paceCompareRow}>
       <Ionicons
         name={comparison.hit ? 'checkmark-circle' : 'close-circle'}
-        size={20}
-        color={comparison.hit ? '#2E7D32' : '#FF3B30'}
+        size={20} color={comparison.hit ? '#2E7D32' : '#FF3B30'}
       />
       <Text style={[styles.paceCompareTitle, { color: comparison.hit ? '#2E7D32' : '#FF3B30' }]}>
         {comparison.hit ? 'Semua Target Tercapai!' : 'Target Belum Tercapai'}
       </Text>
     </View>
 
-    {/* Pace Row */}
     <View style={styles.paceCheckRow}>
-      <Ionicons
-        name={comparison.paceHit ? 'checkmark-circle' : 'close-circle'}
-        size={13} color={comparison.paceHit ? '#2E7D32' : '#FF3B30'}
-      />
+      <Ionicons name={comparison.paceHit ? 'checkmark-circle' : 'close-circle'}
+        size={13} color={comparison.paceHit ? '#2E7D32' : '#FF3B30'} />
       <Text style={styles.paceCheckLabel}>PACE</Text>
       <Text style={styles.paceCheckTarget}>{formatTargetPace(targetPace)}</Text>
       <Ionicons name="arrow-forward" size={11} color="#AAA" />
@@ -137,12 +138,9 @@ const ComparisonBox = ({
       )}
     </View>
 
-    {/* Distance Row */}
     <View style={styles.paceCheckRow}>
-      <Ionicons
-        name={comparison.distanceHit ? 'checkmark-circle' : 'close-circle'}
-        size={13} color={comparison.distanceHit ? '#2E7D32' : '#FF3B30'}
-      />
+      <Ionicons name={comparison.distanceHit ? 'checkmark-circle' : 'close-circle'}
+        size={13} color={comparison.distanceHit ? '#2E7D32' : '#FF3B30'} />
       <Text style={styles.paceCheckLabel}>JARAK</Text>
       <Text style={styles.paceCheckTarget}>{targetDistance} km</Text>
       <Ionicons name="arrow-forward" size={11} color="#AAA" />
@@ -165,6 +163,7 @@ export default function TodayWorkoutCard({
   status = 'planned',
   paceResult,
   tempoResult,
+  intervalResult,
   onStartPress,
   onEdit,
   onDelete,
@@ -181,12 +180,8 @@ export default function TodayWorkoutCard({
     });
   };
 
-  const handleEdit = () => { setMenuVisible(false); onEdit?.(); };
-  const handleDelete = () => { setMenuVisible(false); onDelete?.(); };
-
   const isCompleted = status === 'completed';
   const paceComparison = paceResult ? compareResult(paceResult) : null;
-
   const PHASE_COLORS = ['#FF9500', '#2E7D32', '#007AFF'];
 
   if (isEmpty) {
@@ -217,20 +212,15 @@ export default function TodayWorkoutCard({
               </View>
             )}
             <View ref={menuBtnRef}>
-              <TouchableOpacity
-                onPress={handleMenuPress}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
+              <TouchableOpacity onPress={handleMenuPress} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                 <Text style={styles.menuDots}>•••</Text>
               </TouchableOpacity>
             </View>
           </View>
         </View>
 
-        {/* Workout Name */}
         <Text style={styles.workoutName}>{workoutName}</Text>
 
-        {/* Stats */}
         <View style={styles.statsRow}>
           {stats.map((stat, index) => (
             <View key={index} style={styles.statItem}>
@@ -240,7 +230,7 @@ export default function TodayWorkoutCard({
           ))}
         </View>
 
-        {/* Easy/Long/Interval Run — 1 comparison box */}
+        {/* Easy / Long / Tempo single comparison */}
         {isCompleted && paceComparison && paceResult && (
           <ComparisonBox
             comparison={paceComparison}
@@ -251,7 +241,7 @@ export default function TodayWorkoutCard({
           />
         )}
 
-        {/* Tempo Run — 3 comparison boxes per fase */}
+        {/* Tempo Run — 3 fase */}
         {isCompleted && tempoResult && (
           <View style={styles.tempoBox}>
             {tempoResult.phases.map((phase, index) => {
@@ -262,38 +252,23 @@ export default function TodayWorkoutCard({
                 actualDistance: phase.actualDistance,
               });
               const phaseColor = PHASE_COLORS[index];
-
               return (
                 <View key={index} style={[styles.tempoPhase, { borderLeftColor: phaseColor }]}>
-                  {/* Phase Header */}
                   <View style={styles.tempoPhaseHeader}>
-                    <Text style={[styles.tempoPhaseLabel, { color: phaseColor }]}>
-                      {phase.label}
-                    </Text>
-                    <View style={[
-                      styles.phaseStatusBadge,
-                      { backgroundColor: phaseComparison.hit ? '#F0FFF4' : '#FFF5F5' },
-                    ]}>
+                    <Text style={[styles.tempoPhaseLabel, { color: phaseColor }]}>{phase.label}</Text>
+                    <View style={[styles.phaseStatusBadge, { backgroundColor: phaseComparison.hit ? '#F0FFF4' : '#FFF5F5' }]}>
                       <Ionicons
                         name={phaseComparison.hit ? 'checkmark-circle' : 'close-circle'}
-                        size={12}
-                        color={phaseComparison.hit ? '#2E7D32' : '#FF3B30'}
+                        size={12} color={phaseComparison.hit ? '#2E7D32' : '#FF3B30'}
                       />
-                      <Text style={[
-                        styles.phaseStatusText,
-                        { color: phaseComparison.hit ? '#2E7D32' : '#FF3B30' },
-                      ]}>
+                      <Text style={[styles.phaseStatusText, { color: phaseComparison.hit ? '#2E7D32' : '#FF3B30' }]}>
                         {phaseComparison.hit ? 'Tercapai' : 'Belum'}
                       </Text>
                     </View>
                   </View>
-
-                  {/* Pace */}
                   <View style={styles.paceCheckRow}>
-                    <Ionicons
-                      name={phaseComparison.paceHit ? 'checkmark-circle' : 'close-circle'}
-                      size={13} color={phaseComparison.paceHit ? '#2E7D32' : '#FF3B30'}
-                    />
+                    <Ionicons name={phaseComparison.paceHit ? 'checkmark-circle' : 'close-circle'}
+                      size={13} color={phaseComparison.paceHit ? '#2E7D32' : '#FF3B30'} />
                     <Text style={styles.paceCheckLabel}>PACE</Text>
                     <Text style={styles.paceCheckTarget}>{formatTargetPace(phase.targetPace)}</Text>
                     <Ionicons name="arrow-forward" size={11} color="#AAA" />
@@ -306,13 +281,9 @@ export default function TodayWorkoutCard({
                       </View>
                     )}
                   </View>
-
-                  {/* Distance */}
                   <View style={styles.paceCheckRow}>
-                    <Ionicons
-                      name={phaseComparison.distanceHit ? 'checkmark-circle' : 'close-circle'}
-                      size={13} color={phaseComparison.distanceHit ? '#2E7D32' : '#FF3B30'}
-                    />
+                    <Ionicons name={phaseComparison.distanceHit ? 'checkmark-circle' : 'close-circle'}
+                      size={13} color={phaseComparison.distanceHit ? '#2E7D32' : '#FF3B30'} />
                     <Text style={styles.paceCheckLabel}>JARAK</Text>
                     <Text style={styles.paceCheckTarget}>{phase.targetDistance} km</Text>
                     <Ionicons name="arrow-forward" size={11} color="#AAA" />
@@ -331,6 +302,62 @@ export default function TodayWorkoutCard({
           </View>
         )}
 
+        {/* Interval Run — per rep */}
+        {isCompleted && intervalResult && (
+          <View style={styles.intervalBox}>
+            {/* Consistency bar */}
+            <View style={styles.intervalSummary}>
+              <Text style={styles.intervalSummaryTitle}>
+                {intervalResult.reps.filter((r) => r.hit).length}/{intervalResult.reps.length} target tercapai
+              </Text>
+              <View style={styles.consistencyBar}>
+                {intervalResult.reps.map((r, i) => (
+                  <View key={i} style={[
+                    styles.consistencyBlock,
+                    { backgroundColor: r.hit ? '#4CD964' : '#FF3B30' },
+                  ]} />
+                ))}
+              </View>
+            </View>
+
+            {/* Per rep cards */}
+            {intervalResult.reps.map((r) => (
+              <View key={r.rep} style={[styles.repCard, { borderLeftColor: r.hit ? '#4CD964' : '#FF3B30' }]}>
+                <View style={styles.repCardHeader}>
+                  <Text style={styles.repCardNum}>REP {r.rep}</Text>
+                  <View style={[styles.repCardBadge, { backgroundColor: r.hit ? '#F0FFF4' : '#FFF5F5' }]}>
+                    <Ionicons
+                      name={r.hit ? 'checkmark-circle' : 'close-circle'}
+                      size={11} color={r.hit ? '#2E7D32' : '#FF3B30'}
+                    />
+                    <Text style={[styles.repCardBadgeText, { color: r.hit ? '#2E7D32' : '#FF3B30' }]}>
+                      {r.hit ? 'Tercapai' : 'Belum'}
+                    </Text>
+                  </View>
+                </View>
+                <View style={styles.repCardStats}>
+                  <View style={styles.repCardStat}>
+                    <Text style={styles.repCardStatLabel}>JARAK</Text>
+                    <Text style={styles.repCardStatValue}>{r.distance.toFixed(2)}km</Text>
+                    <Text style={styles.repCardStatTarget}>target {intervalResult.targetDistance}km</Text>
+                  </View>
+                  <View style={styles.repCardStat}>
+                    <Text style={styles.repCardStatLabel}>PACE</Text>
+                    <Text style={[styles.repCardStatValue, { color: r.hit ? '#2E7D32' : '#FF3B30' }]}>
+                      {r.pace}/km
+                    </Text>
+                    <Text style={styles.repCardStatTarget}>target {formatTargetPace(intervalResult.targetPace)}</Text>
+                  </View>
+                  <View style={styles.repCardStat}>
+                    <Text style={styles.repCardStatLabel}>WAKTU</Text>
+                    <Text style={styles.repCardStatValue}>{formatDuration(r.duration)}</Text>
+                  </View>
+                </View>
+              </View>
+            ))}
+          </View>
+        )}
+
         {/* Button */}
         {isCompleted ? (
           <View style={styles.completedBtn}>
@@ -345,26 +372,20 @@ export default function TodayWorkoutCard({
         )}
       </View>
 
-      {/* Menu */}
-      <Modal
-        visible={menuVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setMenuVisible(false)}
-      >
+      <Modal visible={menuVisible} transparent animationType="fade" onRequestClose={() => setMenuVisible(false)}>
         <TouchableWithoutFeedback onPress={() => setMenuVisible(false)}>
           <View style={styles.menuOverlay}>
             <View style={[styles.menuBox, { top: menuPosition.top, right: menuPosition.right }]}>
               {!isCompleted && (
                 <>
-                  <TouchableOpacity style={styles.menuItem} onPress={handleEdit}>
+                  <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuVisible(false); onEdit?.(); }}>
                     <Ionicons name="pencil-outline" size={16} color="#1A1A2E" />
                     <Text style={styles.menuItemText}>Edit</Text>
                   </TouchableOpacity>
                   <View style={styles.menuDivider} />
                 </>
               )}
-              <TouchableOpacity style={styles.menuItem} onPress={handleDelete}>
+              <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuVisible(false); onDelete?.(); }}>
                 <Ionicons name="trash-outline" size={16} color="#FF3B30" />
                 <Text style={[styles.menuItemText, { color: '#FF3B30' }]}>Hapus</Text>
               </TouchableOpacity>
@@ -409,48 +430,47 @@ const styles = StyleSheet.create({
   },
   completedBadgeText: { fontSize: 11, fontWeight: '600', color: '#2E7D32' },
   menuDots: { fontSize: 14, color: '#888', letterSpacing: 1 },
-  workoutName: {
-    fontSize: 20, fontWeight: '700', color: '#1A1A2E',
-    marginBottom: 20, letterSpacing: -0.3,
-  },
+  workoutName: { fontSize: 20, fontWeight: '700', color: '#1A1A2E', marginBottom: 20, letterSpacing: -0.3 },
   statsRow: { flexDirection: 'row', gap: 28, marginBottom: 20, flexWrap: 'wrap' },
   statItem: { gap: 4 },
   statLabel: { fontSize: 11, fontWeight: '600', color: '#999', letterSpacing: 0.5 },
   statValue: { fontSize: 16, fontWeight: '700', color: '#1A1A2E' },
 
   // Pace Compare
-  paceCompareBox: {
-    borderRadius: 12, padding: 14, marginBottom: 16, gap: 10,
-  },
+  paceCompareBox: { borderRadius: 12, padding: 14, marginBottom: 16, gap: 10 },
   paceCompareRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
   paceCompareTitle: { fontSize: 13, fontWeight: '700' },
   paceCheckRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
-  paceCheckLabel: {
-    fontSize: 10, fontWeight: '700', color: '#AAA', letterSpacing: 0.5, width: 36,
-  },
+  paceCheckLabel: { fontSize: 10, fontWeight: '700', color: '#AAA', letterSpacing: 0.5, width: 36 },
   paceCheckTarget: { fontSize: 13, fontWeight: '600', color: '#888' },
   paceCheckActual: { fontSize: 13, fontWeight: '800' },
-  diffBadge: {
-    backgroundColor: '#FFE8E8', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6,
-  },
+  diffBadge: { backgroundColor: '#FFE8E8', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
   diffBadgeText: { fontSize: 11, fontWeight: '600', color: '#FF3B30' },
 
   // Tempo
   tempoBox: { gap: 10, marginBottom: 16 },
-  tempoPhase: {
-    backgroundColor: '#FAFAFA', borderRadius: 12,
-    padding: 12, gap: 8, borderLeftWidth: 3,
-  },
-  tempoPhaseHeader: {
-    flexDirection: 'row', alignItems: 'center',
-    justifyContent: 'space-between', marginBottom: 2,
-  },
+  tempoPhase: { backgroundColor: '#FAFAFA', borderRadius: 12, padding: 12, gap: 8, borderLeftWidth: 3 },
+  tempoPhaseHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 },
   tempoPhaseLabel: { fontSize: 12, fontWeight: '800', letterSpacing: 0.5 },
-  phaseStatusBadge: {
-    flexDirection: 'row', alignItems: 'center', gap: 3,
-    paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8,
-  },
+  phaseStatusBadge: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 },
   phaseStatusText: { fontSize: 10, fontWeight: '700' },
+
+  // Interval
+  intervalBox: { gap: 8, marginBottom: 16 },
+  intervalSummary: { backgroundColor: '#F8F8F8', borderRadius: 12, padding: 12, gap: 8 },
+  intervalSummaryTitle: { fontSize: 13, fontWeight: '700', color: '#1A1A2E' },
+  consistencyBar: { flexDirection: 'row', gap: 4, flexWrap: 'wrap' },
+  consistencyBlock: { flex: 1, minWidth: 16, height: 8, borderRadius: 4 },
+  repCard: { backgroundColor: '#FAFAFA', borderRadius: 12, padding: 12, borderLeftWidth: 3, gap: 8 },
+  repCardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  repCardNum: { fontSize: 13, fontWeight: '800', color: '#1A1A2E' },
+  repCardBadge: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 },
+  repCardBadgeText: { fontSize: 10, fontWeight: '700' },
+  repCardStats: { flexDirection: 'row', justifyContent: 'space-between' },
+  repCardStat: { alignItems: 'center', gap: 2 },
+  repCardStatLabel: { fontSize: 9, fontWeight: '700', color: '#AAA', letterSpacing: 0.5 },
+  repCardStatValue: { fontSize: 14, fontWeight: '800', color: '#1A1A2E' },
+  repCardStatTarget: { fontSize: 9, color: '#BBB' },
 
   // Buttons
   startButton: {
@@ -473,10 +493,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.12, shadowRadius: 12, elevation: 8,
     borderWidth: 1, borderColor: '#F0F0F0',
   },
-  menuItem: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    paddingHorizontal: 16, paddingVertical: 12,
-  },
+  menuItem: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 12 },
   menuItemText: { fontSize: 14, fontWeight: '600', color: '#1A1A2E' },
   menuDivider: { height: 0.5, backgroundColor: '#EEEEEE', marginHorizontal: 12 },
 });

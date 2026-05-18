@@ -1,11 +1,11 @@
 export type WorkoutField =
   | 'distance'
   | 'pace'
-  | 'sets'
   | 'reps'
+  | 'restTime'
+  | 'sets'
   | 'weight'
   | 'duration'
-  | 'restDuration'
   | 'notes';
 
 export type WorkoutFormConfig = {
@@ -33,10 +33,10 @@ export const WORKOUT_FORM_CONFIGS: Record<string, WorkoutFormConfig> = {
   },
   'Interval Run': {
     workoutType: 'Interval Run',
-    fields: ['distance', 'reps', 'restDuration', 'notes'],
-    distanceUnit: 'm',
+    fields: ['distance', 'pace', 'reps', 'restTime', 'notes'],
+    distanceUnit: 'km',
     paceUnit: '/km',
-    notesPlaceholder: 'Berapa repetisi selesai? Pace tiap interval? Bagaimana recovery?',
+    notesPlaceholder: 'Berapa reps selesai? Pace tiap interval? Recovery time?',
   },
   'Tempo Run': {
     workoutType: 'Tempo Run',
@@ -69,7 +69,6 @@ const formatMinutes = (totalMin: number): string => {
   return `${mins} menit`;
 };
 
-// Easy Run, Tempo Run, Long Run: jarak × pace
 export const calcEstimatedTime = (
   distance: string,
   pace: string,
@@ -82,17 +81,16 @@ export const calcEstimatedTime = (
   return formatMinutes(distanceInKm * p);
 };
 
-// Interval Run: jarak per interval × pace × sets
 export const calcIntervalTime = (
   distance: string,
   pace: string,
-  sets: string,
+  reps: string,
   unit: 'km' | 'm' = 'm'
 ): string => {
   const d = parseFloat(distance);
   const p = parseFloat(pace);
-  const s = parseInt(sets);
-  if (!d || !p || !s || isNaN(d) || isNaN(p) || isNaN(s) || d <= 0 || p <= 0 || s <= 0) return '--';
+  const r = parseInt(reps);
+  if (!d || !p || !r || isNaN(d) || isNaN(p) || isNaN(r) || d <= 0 || p <= 0 || r <= 0) return '--';
   const distanceInKm = unit === 'm' ? d / 1000 : d;
-  return formatMinutes(distanceInKm * p * s);
+  return formatMinutes(distanceInKm * p * r);
 };
