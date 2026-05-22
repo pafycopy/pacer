@@ -11,10 +11,10 @@ export const calcTime = (distance: string, pace: string): number => {
 export const formatMinutes = (totalMin: number): string => {
   if (totalMin <= 0) return '--';
   const hours = Math.floor(totalMin / 60);
-  const mins = Math.floor(totalMin % 60);
-  const secs = Math.round((totalMin % 1) * 60);
+  const mins  = Math.floor(totalMin % 60);
+  const secs  = Math.round((totalMin % 1) * 60);
   if (hours > 0) return `${hours}j ${mins}m`;
-  if (secs > 0) return `${mins}m ${secs}s`;
+  if (secs > 0)  return `${mins}m ${secs}s`;
   return `${mins} menit`;
 };
 
@@ -37,7 +37,7 @@ const resolveEstTime = (workout: SavedWorkout): string => {
 
 export const resolveStats = (workout: SavedWorkout) => {
   const config = getFormConfig(workout.workoutType);
-  const stats = [];
+  const stats  = [];
 
   if (workout.workoutType === 'Strength Training') {
     stats.push({ label: 'CATEGORY',   value: workout.trainingCategory ?? '-' });
@@ -49,11 +49,11 @@ export const resolveStats = (workout: SavedWorkout) => {
   if (workout.workoutType === 'Tempo Run' && workout.warmup && workout.tempo && workout.cooldown) {
     const totalTime =
       calcTime(workout.warmup.distance, workout.warmup.pace) +
-      calcTime(workout.tempo.distance, workout.tempo.targetPace) +
+      calcTime(workout.tempo.distance,  workout.tempo.targetPace) +
       calcTime(workout.cooldown.distance, workout.cooldown.pace);
     const totalDistance = (
-      (parseFloat(workout.warmup.distance) || 0) +
-      (parseFloat(workout.tempo.distance) || 0) +
+      (parseFloat(workout.warmup.distance)   || 0) +
+      (parseFloat(workout.tempo.distance)    || 0) +
       (parseFloat(workout.cooldown.distance) || 0)
     ).toFixed(2);
     stats.push({ label: 'TOTAL JARAK', value: `${totalDistance} km` });
@@ -62,20 +62,29 @@ export const resolveStats = (workout: SavedWorkout) => {
     return stats;
   }
 
+  // ── Interval Run — ganti EST. TIME dengan REPETISI ────────────────────────
+  if (workout.workoutType === 'Interval Run') {
+    stats.push({ label: 'DISTANCE',    value: `${workout.distance ?? '-'} km` });
+    stats.push({ label: 'TARGET PACE', value: `${workout.pace ?? '-'}/km` });
+    stats.push({ label: 'REPETISI',    value: `${workout.reps ?? '-'}x` });
+    return stats;
+  }
+
+  // ── Generic (Easy Run, Long Run, dll) ────────────────────────────────────
   if (config.fields.includes('distance')) {
-    stats.push({ label: 'DISTANCE', value: `${workout.distance} ${config.distanceUnit ?? 'km'}` });
+    stats.push({ label: 'DISTANCE',    value: `${workout.distance} ${config.distanceUnit ?? 'km'}` });
   }
   if (config.fields.includes('pace')) {
     stats.push({ label: 'TARGET PACE', value: `${workout.pace}/km` });
   }
   if (config.fields.includes('sets')) {
-    stats.push({ label: 'SETS', value: workout.sets || '-' });
+    stats.push({ label: 'SETS',        value: workout.sets || '-' });
   }
   if (config.fields.includes('weight')) {
-    stats.push({ label: 'WEIGHT', value: workout.weight ? `${workout.weight} kg` : '-' });
+    stats.push({ label: 'WEIGHT',      value: workout.weight ? `${workout.weight} kg` : '-' });
   }
   if (workout.workoutType !== 'Rest Day') {
-    stats.push({ label: 'EST. TIME', value: resolveEstTime(workout) });
+    stats.push({ label: 'EST. TIME',   value: resolveEstTime(workout) });
   }
 
   return stats;

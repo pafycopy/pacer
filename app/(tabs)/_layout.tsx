@@ -7,6 +7,8 @@ const Tabslayout = () => {
   return (
     <Tabs 
       screenOptions={{
+        tabBarActiveTintColor:'#006E2F',
+        tabBarInactiveTintColor:'#191C1E',
         headerShown: false,
         tabBarStyle: {
           height: 60, // atur tinggi di sini (coba 50–70)

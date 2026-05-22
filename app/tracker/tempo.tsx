@@ -385,35 +385,48 @@ export default function TempoTracker() {
 
   // ─── Done screen ──────────────────────────────────────────────────────────
   if (status === 'done' && finalResults) {
-    const totalDist = Object.values(finalResults).reduce((a, r) => a + r.actualDistance, 0);
+    const totalDist     = Object.values(finalResults).reduce((a, r) => a + r.actualDistance, 0);
     const totalDuration = Object.values(finalResults).reduce((a, r) => a + r.actualDuration, 0);
+    const hitCount      = Object.values(finalResults).filter((r) => r.hit).length;
+    const allHit        = hitCount === phases.length;
 
     return (
-      <SafeAreaView style={styles.safeArea}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()}>
-            <Ionicons name="chevron-back" size={24} color="#111" />
-          </TouchableOpacity>
-          <Text style={styles.workoutName}>{workoutName || 'TEMPO RUN'}</Text>
-          <View style={{ width: 24 }} />
-        </View>
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: '#FFFFFF' }]}>
+        <ScrollView contentContainerStyle={styles.doneContainer} showsVerticalScrollIndicator={false}>
 
-        <ScrollView contentContainerStyle={styles.doneContainer}>
-          <Text style={styles.doneTitle}>🎉 Sesi Selesai!</Text>
+          {/* Trophy icon */}
+                    <View style={styles.trophyWrapper}>
+                      <Ionicons name="trophy" size={36} color="#5BFF7A" />
+                    </View>
+
+          {/* Judul */}
+          <Text style={styles.doneTitle}>Workout{'Selesai!'}</Text>
           <Text style={styles.doneSub}>
-            {Object.values(finalResults).filter((r) => r.hit).length}/{phases.length} fase tercapai
+            {allHit
+              ? 'Semua target tercapai, kerja bagus!'
+              : `${hitCount}/${phases.length} fase tercapai, terus tingkatkan!`}
           </Text>
 
-          {/* Summary total */}
-          <View style={styles.summaryBox}>
-            <View style={styles.summaryItem}>
-              <Text style={styles.summaryLabel}>TOTAL WAKTU</Text>
-              <Text style={styles.summaryValue}>{formatTime(totalDuration)}</Text>
+          {/* Total durasi */}
+          <View style={styles.durationBox}>
+            <Text style={styles.durationLabel}>DURASI TOTAL</Text>
+            <Text style={styles.durationValue}>{formatTime(totalDuration)}</Text>
+            <Text style={styles.durationUnit}>Menit</Text>
+          </View>
+
+          {/* 2 stat: jarak & fase tercapai */}
+          <View style={styles.statRow}>
+            <View style={styles.statBox}>
+              <Text style={styles.statBoxEmoji}>📍</Text>
+              <Text style={styles.statBoxLabel}>JARAK</Text>
+              <Text style={styles.statBoxValue}>{totalDist.toFixed(2)}</Text>
+              <Text style={styles.statBoxUnit}>km</Text>
             </View>
-            <View style={styles.summaryDivider} />
-            <View style={styles.summaryItem}>
-              <Text style={styles.summaryLabel}>TOTAL JARAK</Text>
-              <Text style={styles.summaryValue}>{totalDist.toFixed(2)} km</Text>
+            <View style={styles.statBox}>
+              <Text style={styles.statBoxEmoji}>⚡</Text>
+              <Text style={styles.statBoxLabel}>FASE TERCAPAI</Text>
+              <Text style={styles.statBoxValue}>{hitCount}/{phases.length}</Text>
+              <Text style={styles.statBoxUnit}>fase</Text>
             </View>
           </View>
 
@@ -430,7 +443,7 @@ export default function TempoTracker() {
                 <View style={styles.phaseResultHeader}>
                   <Text style={styles.phaseResultTitle}>{phase.emoji} {phase.label.toUpperCase()}</Text>
                   <View style={[
-                    styles.badge2,
+                    styles.hitBadge,
                     { backgroundColor: result.hit ? '#F0FFF4' : '#FFF5F5' },
                   ]}>
                     <Ionicons
@@ -438,7 +451,7 @@ export default function TempoTracker() {
                       size={12}
                       color={result.hit ? '#2E7D32' : '#FF3B30'}
                     />
-                    <Text style={[styles.badgeText2, { color: result.hit ? '#2E7D32' : '#FF3B30' }]}>
+                    <Text style={[styles.hitBadgeText, { color: result.hit ? '#2E7D32' : '#FF3B30' }]}>
                       {result.hit ? 'Tercapai' : 'Belum'}
                     </Text>
                   </View>
@@ -452,10 +465,7 @@ export default function TempoTracker() {
                   </View>
                   <View style={styles.phaseResultStat}>
                     <Text style={styles.phaseStatLabel}>PACE</Text>
-                    <Text style={[
-                      styles.phaseStatValue,
-                      { color: result.hit ? '#2E7D32' : '#FF3B30' },
-                    ]}>
+                    <Text style={[styles.phaseStatValue, { color: result.hit ? '#2E7D32' : '#FF3B30' }]}>
                       {result.actualPace}/km
                     </Text>
                     <Text style={styles.phaseStatTarget}>target {formatPace(result.targetPace)}/km</Text>
@@ -469,9 +479,11 @@ export default function TempoTracker() {
             );
           })}
 
+          {/* Tombol */}
           <TouchableOpacity style={styles.doneBtn} onPress={() => router.back()}>
-            <Text style={styles.doneBtnText}>Selesai</Text>
+            <Text style={styles.doneBtnText}>Kembali ke Dashboard →</Text>
           </TouchableOpacity>
+
         </ScrollView>
       </SafeAreaView>
     );
@@ -693,32 +705,57 @@ const styles = StyleSheet.create({
   finishText: { fontWeight: '700', letterSpacing: 1, fontSize: 14 },
 
   // Done screen
-  doneContainer: { padding: 20, gap: 16, paddingBottom: 40 },
-  doneTitle: { fontSize: 28, fontWeight: '800', color: '#1A1A2E', textAlign: 'center' },
-  doneSub: { fontSize: 15, color: '#888', textAlign: 'center' },
-  summaryBox: {
-    backgroundColor: '#1A1A2E', borderRadius: 16, padding: 20,
-    flexDirection: 'row', alignItems: 'center',
+  doneContainer: {
+    padding: 24, gap: 20, paddingBottom: 48,
+    alignItems: 'center',
   },
-  summaryItem: { flex: 1, alignItems: 'center' },
-  summaryDivider: { width: 1, height: 36, backgroundColor: '#FFFFFF22' },
-  summaryLabel: { fontSize: 10, fontWeight: '600', color: '#FFFFFF88', letterSpacing: 0.5 },
-  summaryValue: { fontSize: 24, fontWeight: '800', color: '#FFFFFF', marginTop: 4 },
-  sectionTitle: { fontSize: 11, fontWeight: '700', color: '#999', letterSpacing: 0.8 },
+ trophyWrapper: {
+    width: 88, height: 88, borderRadius: 44,
+    backgroundColor: '#111', alignItems: 'center', justifyContent: 'center',
+    marginTop: 12,
+  },
+  doneTitle: {
+    fontSize: 36, fontWeight: '900', color: '#1A1A2E',
+    textAlign: 'center', lineHeight: 42,
+  },
+  doneSub: { fontSize: 14, color: '#888', textAlign: 'center', lineHeight: 20 },
+  durationBox: {
+    width: '100%', backgroundColor: '#F4F4F4',
+    borderRadius: 16, padding: 20, gap: 2,
+  },
+  durationLabel: { fontSize: 11, fontWeight: '700', color: '#AAA', letterSpacing: 0.8 },
+  durationValue: { fontSize: 36, fontWeight: '900', color: '#1A1A2E' },
+  durationUnit:  { fontSize: 14, color: '#888', fontWeight: '600' },
+  statRow: { flexDirection: 'row', gap: 12, width: '100%' },
+  statBox: {
+    flex: 1, backgroundColor: '#F4F4F4', borderRadius: 16,
+    padding: 16, gap: 2,
+  },
+  statBoxEmoji: { fontSize: 22, marginBottom: 4 },
+  statBoxLabel: { fontSize: 10, fontWeight: '700', color: '#AAA', letterSpacing: 0.5 },
+  statBoxValue: { fontSize: 24, fontWeight: '900', color: '#1A1A2E' },
+  statBoxUnit:  { fontSize: 12, color: '#888', fontWeight: '500' },
+  sectionTitle: {
+    alignSelf: 'flex-start',
+    fontSize: 11, fontWeight: '700', color: '#999', letterSpacing: 0.8,
+  },
   phaseResultCard: {
-    backgroundColor: '#FFFFFF', borderRadius: 14, padding: 14,
+    width: '100%',
+    backgroundColor: '#F9F9F9', borderRadius: 14, padding: 14,
     borderLeftWidth: 4, gap: 10,
-    shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6, elevation: 2,
   },
   phaseResultHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   phaseResultTitle: { fontSize: 13, fontWeight: '800', color: '#1A1A2E' },
-  badge2: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
-  badgeText2: { fontSize: 11, fontWeight: '700' },
+  hitBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
+  hitBadgeText: { fontSize: 11, fontWeight: '700' },
   phaseResultStats: { flexDirection: 'row', justifyContent: 'space-between' },
   phaseResultStat: { alignItems: 'center', gap: 2 },
   phaseStatLabel: { fontSize: 10, fontWeight: '600', color: '#AAA', letterSpacing: 0.5 },
-  phaseStatValue: { fontSize: 16, fontWeight: '800', color: '#1A1A2E' },
+  phaseStatValue: { fontSize: 15, fontWeight: '800', color: '#1A1A2E' },
   phaseStatTarget: { fontSize: 10, color: '#BBB' },
-  doneBtn: { backgroundColor: '#1A1A2E', borderRadius: 40, paddingVertical: 16, alignItems: 'center' },
-  doneBtnText: { color: '#FFFFFF', fontWeight: '800', fontSize: 16 },
+  doneBtn: {
+    width: '100%', backgroundColor: '#63EA7B',
+    borderRadius: 40, paddingVertical: 16, alignItems: 'center',
+  },
+  doneBtnText: { color: '#111', fontWeight: '800', fontSize: 16 },
 });

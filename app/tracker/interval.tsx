@@ -14,10 +14,9 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useFinishWorkout } from '@/hooks/useFinishWorkout';
 
-// ─── Konstanta filter GPS ───────────────────────────────────────────────────
-const MIN_SPEED_MS       = 1.0;    // minimal 1.0 m/s (~3.6 km/h) baru dihitung bergerak
-const MIN_ACCURACY_M     = 15;     // tolak titik GPS dengan akurasi > 15 meter
-const MIN_DIST_THRESHOLD = 0.003;  // minimal 3 meter (0.003 km) per update agar dihitung
+const MIN_SPEED_MS       = 1.0;
+const MIN_ACCURACY_M     = 15;
+const MIN_DIST_THRESHOLD = 0.003;
 const HOLD_DURATION      = 2000;
 
 type RepPhase = 'idle' | 'running' | 'rest' | 'done';
@@ -37,15 +36,15 @@ export default function IntervalTracker() {
       uid: string;
       dateKey: string;
       workoutName: string;
-      distance: string; // dalam kilometer
+      distance: string;
       pace: string;
       reps: string;
       restTime: string;
     }>();
 
-  const totalReps      = parseInt(reps ?? '1');
-  const targetDistKm   = parseFloat(distance ?? '0');
-  const restDuration   = parseInt(restTime ?? '0');
+  const totalReps    = parseInt(reps ?? '1');
+  const targetDistKm = parseFloat(distance ?? '0');
+  const restDuration = parseInt(restTime ?? '0');
 
   const [currentRep,    setCurrentRep]    = useState(1);
   const [phase,         setPhase]         = useState<RepPhase>('idle');
@@ -57,20 +56,19 @@ export default function IntervalTracker() {
   const [totalTime,     setTotalTime]     = useState(0);
   const [repResults,    setRepResults]    = useState<RepResult[]>([]);
 
-  const subscription      = useRef<any>(null);
-  const repTimerRef       = useRef<any>(null);
-  const restTimerRef      = useRef<any>(null);
-  const totalTimerRef     = useRef<any>(null);
-  const holdTimeout       = useRef<any>(null);
-  const lastLocationRef   = useRef<any>(null);
-  const isMovingRef       = useRef<boolean>(false);
-  const phaseRef          = useRef<RepPhase>('idle');
-  const repDistRef        = useRef<number>(0);
-  const repMovingTimeRef  = useRef<number>(0);
-  const repTimeRef        = useRef<number>(0);
-  const currentRepRef     = useRef<number>(1);
+  const subscription     = useRef<any>(null);
+  const repTimerRef      = useRef<any>(null);
+  const restTimerRef     = useRef<any>(null);
+  const totalTimerRef    = useRef<any>(null);
+  const holdTimeout      = useRef<any>(null);
+  const lastLocationRef  = useRef<any>(null);
+  const isMovingRef      = useRef<boolean>(false);
+  const phaseRef         = useRef<RepPhase>('idle');
+  const repDistRef       = useRef<number>(0);
+  const repMovingTimeRef = useRef<number>(0);
+  const repTimeRef       = useRef<number>(0);
+  const currentRepRef    = useRef<number>(1);
 
-  // ─── Kalman filter state per sumbu ────────────────────────────────────────
   const kalmanRef = useRef({
     lat: { estimate: 0, errorEstimate: 1, errorMeasure: 0.01, gain: 0, initialized: false },
     lon: { estimate: 0, errorEstimate: 1, errorMeasure: 0.01, gain: 0, initialized: false },
@@ -78,79 +76,55 @@ export default function IntervalTracker() {
 
   const holdProgress = useSharedValue(0);
 
-  // ─── Hook finish ───────────────────────────────────────────────────────────
   const { finish } = useFinishWorkout(
-    dateKey,
-    uid,
+    dateKey, uid,
     [repTimerRef, restTimerRef, totalTimerRef],
     subscription,
-    {
-      hasOwnDoneScreen: true,
-      onAfterSave: () => setPhase('done'),
-    },
+    { hasOwnDoneScreen: true, onAfterSave: () => setPhase('done') },
   );
 
-  // Sync refs
-  useEffect(() => { phaseRef.current = phase; },               [phase]);
-  useEffect(() => { repDistRef.current = repDist; },           [repDist]);
-  useEffect(() => { repMovingTimeRef.current = repMovingTime; },[repMovingTime]);
-  useEffect(() => { repTimeRef.current = repTime; },           [repTime]);
-  useEffect(() => { currentRepRef.current = currentRep; },     [currentRep]);
+  useEffect(() => { phaseRef.current        = phase;         }, [phase]);
+  useEffect(() => { repDistRef.current      = repDist;       }, [repDist]);
+  useEffect(() => { repMovingTimeRef.current = repMovingTime; }, [repMovingTime]);
+  useEffect(() => { repTimeRef.current      = repTime;       }, [repTime]);
+  useEffect(() => { currentRepRef.current   = currentRep;   }, [currentRep]);
 
-  // Total timer
   useEffect(() => {
     if (phase === 'running' || phase === 'rest') {
       totalTimerRef.current = setInterval(() => setTotalTime((p) => p + 1), 1000);
-    } else {
-      clearInterval(totalTimerRef.current);
-    }
+    } else { clearInterval(totalTimerRef.current); }
     return () => clearInterval(totalTimerRef.current);
   }, [phase]);
 
-  // Rep timer — hanya tambah movingTime kalau benar-benar bergerak
   useEffect(() => {
     if (phase === 'running') {
       repTimerRef.current = setInterval(() => {
         setRepTime((p) => p + 1);
         if (isMovingRef.current) setRepMovingTime((p) => p + 1);
       }, 1000);
-    } else {
-      clearInterval(repTimerRef.current);
-    }
+    } else { clearInterval(repTimerRef.current); }
     return () => clearInterval(repTimerRef.current);
   }, [phase]);
 
-  // Rest countdown
   useEffect(() => {
     if (phase === 'rest') {
       restTimerRef.current = setInterval(() => {
         setRestCountdown((p) => {
-          if (p <= 1) {
-            clearInterval(restTimerRef.current);
-            startNextRep();
-            return restDuration;
-          }
+          if (p <= 1) { clearInterval(restTimerRef.current); startNextRep(); return restDuration; }
           return p - 1;
         });
       }, 1000);
-    } else {
-      clearInterval(restTimerRef.current);
-    }
+    } else { clearInterval(restTimerRef.current); }
     return () => clearInterval(restTimerRef.current);
   }, [phase]);
 
-  // ─── Kalman filter 1D ─────────────────────────────────────────────────────
   const kalmanUpdate = (axis: 'lat' | 'lon', measurement: number): number => {
     const k = kalmanRef.current[axis];
-    if (!k.initialized) {
-      k.estimate     = measurement;
-      k.initialized  = true;
-      return measurement;
-    }
-    k.errorEstimate += 0.0001; // process noise
-    k.gain           = k.errorEstimate / (k.errorEstimate + k.errorMeasure);
-    k.estimate       = k.estimate + k.gain * (measurement - k.estimate);
-    k.errorEstimate  = (1 - k.gain) * k.errorEstimate;
+    if (!k.initialized) { k.estimate = measurement; k.initialized = true; return measurement; }
+    k.errorEstimate += 0.0001;
+    k.gain          = k.errorEstimate / (k.errorEstimate + k.errorMeasure);
+    k.estimate      = k.estimate + k.gain * (measurement - k.estimate);
+    k.errorEstimate = (1 - k.gain) * k.errorEstimate;
     return k.estimate;
   };
 
@@ -161,14 +135,13 @@ export default function IntervalTracker() {
     };
   };
 
-  // ─── Haversine ────────────────────────────────────────────────────────────
   const toRad = (v: number) => (v * Math.PI) / 180;
 
   const getDistance = (loc1: any, loc2: any): number => {
-    const R    = 6371;
+    const R = 6371;
     const dLat = toRad(loc2.latitude  - loc1.latitude);
     const dLon = toRad(loc2.longitude - loc1.longitude);
-    const a    =
+    const a =
       Math.sin(dLat / 2) ** 2 +
       Math.sin(dLon / 2) ** 2 *
       Math.cos(toRad(loc1.latitude)) *
@@ -176,7 +149,6 @@ export default function IntervalTracker() {
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   };
 
-  // ─── Helper format ────────────────────────────────────────────────────────
   const calcPace = (dist: number, movingTime: number): string => {
     if (dist === 0 || movingTime === 0) return '--:--';
     const s = movingTime / dist;
@@ -202,51 +174,27 @@ export default function IntervalTracker() {
     return actualSec <= targetPaceVal * 60;
   };
 
-  // ─── GPS watch ────────────────────────────────────────────────────────────
   const startLocationWatch = async () => {
     subscription.current = await Location.watchPositionAsync(
-      {
-        accuracy:         Location.Accuracy.BestForNavigation,
-        timeInterval:     1000,   // update per 1 detik (bukan 500ms) → lebih stabil
-        distanceInterval: 2,      // minimal bergerak 2 meter baru trigger update
-      },
+      { accuracy: Location.Accuracy.BestForNavigation, timeInterval: 1000, distanceInterval: 2 },
       (loc) => {
         const coord    = loc.coords;
         const accuracy = coord.accuracy ?? 999;
         const speed    = coord.speed ?? 0;
-
-        // 1. Tolak titik dengan akurasi buruk
         if (accuracy > MIN_ACCURACY_M) return;
-
-        // 2. Tentukan apakah sedang bergerak berdasarkan speed sensor
         isMovingRef.current = speed >= MIN_SPEED_MS;
-
-        // 3. Kalman filter pada koordinat
-        const filteredLat = kalmanUpdate('lat', coord.latitude);
-        const filteredLon = kalmanUpdate('lon', coord.longitude);
+        const filteredLat   = kalmanUpdate('lat', coord.latitude);
+        const filteredLon   = kalmanUpdate('lon', coord.longitude);
         const filteredCoord = { latitude: filteredLat, longitude: filteredLon };
-
         setRepDist((prev) => {
           const last = lastLocationRef.current;
-          if (!last) {
-            lastLocationRef.current = filteredCoord;
-            return prev;
-          }
-
+          if (!last) { lastLocationRef.current = filteredCoord; return prev; }
           const dist = getDistance(last, filteredCoord);
-
-          // 4. Tolak jarak terlalu kecil (noise GPS diam)
           if (dist < MIN_DIST_THRESHOLD) return prev;
-
-          // 5. Tolak jarak tidak wajar > 0.1 km per update (teleport / spike)
-          if (dist > 0.1) return prev;
-
-          // 6. Tolak jika tidak bergerak menurut sensor speed
-          if (!isMovingRef.current) return prev;
-
+          if (dist > 0.1)               return prev;
+          if (!isMovingRef.current)     return prev;
           lastLocationRef.current = filteredCoord;
           const newDist = prev + dist;
-
           if (newDist >= targetDistKm && phaseRef.current === 'running') {
             setTimeout(() => triggerAutoComplete(newDist), 0);
           }
@@ -256,28 +204,19 @@ export default function IntervalTracker() {
     );
   };
 
-  // ─── Logic rep ────────────────────────────────────────────────────────────
   const triggerAutoComplete = async (finalDist: number) => {
     if (phaseRef.current !== 'running') return;
-
     subscription.current?.remove();
     subscription.current = null;
     clearInterval(repTimerRef.current);
-
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     Vibration.vibrate([0, 150, 100, 150]);
-
     const actualPace = calcPace(finalDist, repMovingTimeRef.current);
     const hit        = isPaceHit(actualPace) && finalDist >= targetDistKm;
-
     const result: RepResult = {
-      rep:      currentRepRef.current,
-      distance: finalDist,
-      duration: repTimeRef.current,
-      pace:     actualPace,
-      hit,
+      rep: currentRepRef.current, distance: finalDist,
+      duration: repTimeRef.current, pace: actualPace, hit,
     };
-
     setRepResults((prev) => {
       const updated = [...prev, result];
       if (currentRepRef.current >= totalReps) {
@@ -293,31 +232,22 @@ export default function IntervalTracker() {
   const startNextRep = async () => {
     clearInterval(restTimerRef.current);
     setCurrentRep((p) => p + 1);
-    setRepDist(0);
-    setRepTime(0);
-    setRepMovingTime(0);
+    setRepDist(0); setRepTime(0); setRepMovingTime(0);
     lastLocationRef.current = null;
-    resetKalman(); // reset filter untuk rep baru
+    resetKalman();
     await startLocationWatch();
     setPhase('running');
   };
 
-  const skipRest = () => {
-    clearInterval(restTimerRef.current);
-    startNextRep();
-  };
+  const skipRest = () => { clearInterval(restTimerRef.current); startNextRep(); };
 
   const finishWorkout = (results: RepResult[]) => {
     const totalDist     = results.reduce((a, r) => a + r.distance, 0);
     const totalDuration = results.reduce((a, r) => a + r.duration, 0);
-
-    // hook otomatis: bersihkan timer + GPS + save store + panggil onAfterSave (setPhase done)
     finish({
-      actualDistance: totalDist,
-      actualDuration: totalDuration,
-      actualPace:     calcPace(totalDist, totalDuration),
-      completedAt:    Date.now(),
-      repResults:     results,
+      actualDistance: totalDist, actualDuration: totalDuration,
+      actualPace: calcPace(totalDist, totalDuration),
+      completedAt: Date.now(), repResults: results,
     });
   };
 
@@ -344,7 +274,6 @@ export default function IntervalTracker() {
     ]);
   };
 
-  // ─── Hold button ──────────────────────────────────────────────────────────
   const distProgress = Math.min(repDist / targetDistKm, 1);
 
   const handleHoldStart = () => {
@@ -376,36 +305,52 @@ export default function IntervalTracker() {
 
   // ─── Done screen ──────────────────────────────────────────────────────────
   if (phase === 'done') {
+    const hitCount  = repResults.filter((r) => r.hit).length;
+    const allHit    = hitCount === totalReps;
+    const totalDist = repResults.reduce((a, r) => a + r.distance, 0);
+
     return (
-      <SafeAreaView style={styles.safeArea}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()}>
-            <Ionicons name="chevron-back" size={24} color="#111" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>{workoutName}</Text>
-          <View style={{ width: 24 }} />
-        </View>
-        <ScrollView contentContainerStyle={styles.doneContainer}>
-          <Text style={styles.doneTitle}>🎉 Sesi Selesai!</Text>
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: '#FFFFFF' }]}>
+        <ScrollView contentContainerStyle={styles.doneContainer} showsVerticalScrollIndicator={false}>
+
+          {/* Trophy icon */}
+            <View style={styles.trophyWrapper}>
+              <Ionicons name="trophy" size={36} color="#5BFF7A" />
+            </View>
+
+          {/* Judul */}
+          <Text style={styles.doneTitle}>Workout{'\n'}Selesai!</Text>
           <Text style={styles.doneSub}>
-            {repResults.filter((r) => r.hit).length}/{totalReps} target tercapai
+            {allHit
+              ? 'Semua target tercapai, kerja bagus!'
+              : `${hitCount}/${totalReps} target tercapai, terus tingkatkan!`}
           </Text>
 
-          <View style={styles.summaryBox}>
-            <View style={styles.summaryItem}>
-              <Text style={styles.summaryLabel}>TOTAL WAKTU</Text>
-              <Text style={styles.summaryValue}>{formatTime(totalTime)}</Text>
+          {/* Durasi total */}
+          <View style={styles.durationBox}>
+            <Text style={styles.durationLabel}>DURASI TOTAL</Text>
+            <Text style={styles.durationValue}>{formatTime(totalTime)}</Text>
+            <Text style={styles.durationUnit}>Menit</Text>
+          </View>
+
+          {/* 2 stat: jarak & rep tercapai */}
+          <View style={styles.statRow}>
+            <View style={styles.statBox}>
+              <Text style={styles.statBoxEmoji}>📍</Text>
+              <Text style={styles.statBoxLabel}>JARAK</Text>
+              <Text style={styles.statBoxValue}>{totalDist.toFixed(2)}</Text>
+              <Text style={styles.statBoxUnit}>km</Text>
             </View>
-            <View style={styles.summaryDivider} />
-            <View style={styles.summaryItem}>
-              <Text style={styles.summaryLabel}>TOTAL JARAK</Text>
-              <Text style={styles.summaryValue}>
-                {repResults.reduce((a, r) => a + r.distance, 0).toFixed(2)} km
-              </Text>
+            <View style={styles.statBox}>
+              <Text style={styles.statBoxEmoji}>⚡</Text>
+              <Text style={styles.statBoxLabel}>REP TERCAPAI</Text>
+              <Text style={styles.statBoxValue}>{hitCount}/{totalReps}</Text>
+              <Text style={styles.statBoxUnit}>rep</Text>
             </View>
           </View>
 
-          <Text style={styles.repResultTitle}>HASIL PER REPETISI</Text>
+          {/* Hasil per rep */}
+          <Text style={styles.sectionTitle}>HASIL PER REPETISI</Text>
 
           {repResults.map((result) => (
             <View key={result.rep} style={[
@@ -414,40 +359,41 @@ export default function IntervalTracker() {
             ]}>
               <View style={styles.repResultHeader}>
                 <Text style={styles.repResultNum}>REP {result.rep}</Text>
-                <View style={[styles.repResultBadge, { backgroundColor: result.hit ? '#F0FFF4' : '#FFF5F5' }]}>
+                <View style={[styles.hitBadge, { backgroundColor: result.hit ? '#F0FFF4' : '#FFF5F5' }]}>
                   <Ionicons
                     name={result.hit ? 'checkmark-circle' : 'close-circle'}
                     size={12} color={result.hit ? '#2E7D32' : '#FF3B30'}
                   />
-                  <Text style={[styles.repResultBadgeText, { color: result.hit ? '#2E7D32' : '#FF3B30' }]}>
+                  <Text style={[styles.hitBadgeText, { color: result.hit ? '#2E7D32' : '#FF3B30' }]}>
                     {result.hit ? 'Target Tercapai' : 'Belum Tercapai'}
                   </Text>
                 </View>
               </View>
               <View style={styles.repResultStats}>
                 <View style={styles.repResultStat}>
-                  <Text style={styles.repResultStatLabel}>JARAK</Text>
-                  <Text style={styles.repResultStatValue}>{result.distance.toFixed(2)} km</Text>
-                  <Text style={styles.repResultStatTarget}>target {targetDistKm} km</Text>
+                  <Text style={styles.repStatLabel}>JARAK</Text>
+                  <Text style={styles.repStatValue}>{result.distance.toFixed(2)} km</Text>
+                  <Text style={styles.repStatTarget}>target {targetDistKm} km</Text>
                 </View>
                 <View style={styles.repResultStat}>
-                  <Text style={styles.repResultStatLabel}>PACE</Text>
-                  <Text style={[styles.repResultStatValue, { color: result.hit ? '#2E7D32' : '#FF3B30' }]}>
+                  <Text style={styles.repStatLabel}>PACE</Text>
+                  <Text style={[styles.repStatValue, { color: result.hit ? '#2E7D32' : '#FF3B30' }]}>
                     {result.pace}/km
                   </Text>
-                  <Text style={styles.repResultStatTarget}>target {formatTargetPace(pace ?? '0')}/km</Text>
+                  <Text style={styles.repStatTarget}>target {formatTargetPace(pace ?? '0')}/km</Text>
                 </View>
                 <View style={styles.repResultStat}>
-                  <Text style={styles.repResultStatLabel}>WAKTU</Text>
-                  <Text style={styles.repResultStatValue}>{formatTime(result.duration)}</Text>
+                  <Text style={styles.repStatLabel}>WAKTU</Text>
+                  <Text style={styles.repStatValue}>{formatTime(result.duration)}</Text>
                 </View>
               </View>
             </View>
           ))}
 
           <TouchableOpacity style={styles.doneBtn} onPress={() => router.back()}>
-            <Text style={styles.doneBtnText}>Selesai</Text>
+            <Text style={styles.doneBtnText}>Kembali ke Dashboard →</Text>
           </TouchableOpacity>
+
         </ScrollView>
       </SafeAreaView>
     );
@@ -467,7 +413,6 @@ export default function IntervalTracker() {
         <View style={{ width: 24 }} />
       </View>
 
-      {/* Rep indicators */}
       <View style={styles.repIndicators}>
         {Array.from({ length: totalReps }).map((_, i) => {
           const done   = i < repResults.length;
@@ -484,7 +429,6 @@ export default function IntervalTracker() {
       </View>
 
       <View style={styles.container}>
-        {/* Rest overlay */}
         {phase === 'rest' && (
           <View style={styles.restOverlay}>
             <Text style={styles.restLabel}>ISTIRAHAT</Text>
@@ -497,7 +441,6 @@ export default function IntervalTracker() {
           </View>
         )}
 
-        {/* Center */}
         <View style={styles.centerContent}>
           <View style={styles.distProgressContainer}>
             <View style={styles.distProgressBar}>
@@ -540,7 +483,6 @@ export default function IntervalTracker() {
           </View>
         </View>
 
-        {/* Buttons */}
         <View>
           {phase === 'idle' && (
             <TouchableOpacity style={[styles.mainBtn, { backgroundColor: '#63EA7B' }]} onPress={handleStart}>
@@ -551,9 +493,7 @@ export default function IntervalTracker() {
           {phase === 'running' && (
             <>
               <Text style={styles.bottomHint}>
-                {isHolding
-                  ? 'Tahan untuk selesaikan rep...'
-                  : 'Otomatis berhenti saat target jarak tercapai'}
+                {isHolding ? 'Tahan untuk selesaikan rep...' : 'Otomatis berhenti saat target jarak tercapai'}
               </Text>
               <Pressable onPressIn={handleHoldStart} onPressOut={handleHoldEnd}>
                 <Animated.View style={[styles.holdBtn, animatedBorderStyle]}>
@@ -579,9 +519,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: '#F0F0F0',
   },
   headerCenter: { alignItems: 'center' },
-  workoutName: { fontSize: 13, fontWeight: '800', letterSpacing: 1, color: '#111' },
-  workoutSub: { fontSize: 11, color: '#888', marginTop: 2 },
-  headerTitle: { fontSize: 13, fontWeight: '800', letterSpacing: 1, color: '#111' },
+  workoutName:  { fontSize: 13, fontWeight: '800', letterSpacing: 1, color: '#111' },
+  workoutSub:   { fontSize: 11, color: '#888', marginTop: 2 },
+  headerTitle:  { fontSize: 13, fontWeight: '800', letterSpacing: 1, color: '#111' },
   repIndicators: {
     flexDirection: 'row', gap: 6, justifyContent: 'center',
     paddingVertical: 10, backgroundColor: '#FFFFFF',
@@ -595,29 +535,29 @@ const styles = StyleSheet.create({
   distProgressBar: { height: 8, backgroundColor: '#E8E8E8', borderRadius: 4, overflow: 'hidden' },
   distProgressFill: { height: '100%', backgroundColor: '#FF9500', borderRadius: 4 },
   distProgressText: { fontSize: 11, color: '#888', textAlign: 'right' },
-  label: { fontSize: 13, letterSpacing: 1.5, color: '#666' },
+  label:    { fontSize: 13, letterSpacing: 1.5, color: '#666' },
   distance: { fontSize: 64, fontWeight: '900', color: '#000', lineHeight: 72 },
-  unit: { fontSize: 28, fontWeight: '700', color: '#555' },
+  unit:     { fontSize: 28, fontWeight: '700', color: '#555' },
   targetHint: { fontSize: 12, color: '#888' },
   statsRow: { flexDirection: 'row', gap: 12, width: '100%' },
   statCard: { flex: 1, backgroundColor: '#F8F8F8', borderRadius: 14, paddingVertical: 16, alignItems: 'center' },
   statLabel: { fontSize: 10, color: '#888', fontWeight: '600', letterSpacing: 1 },
   statValue: { fontSize: 20, fontWeight: '900', color: '#000', marginTop: 4 },
-  statSub: { fontSize: 9, color: '#AAA', marginTop: 2 },
+  statSub:   { fontSize: 9, color: '#AAA', marginTop: 2 },
   restOverlay: {
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
     backgroundColor: '#1A1A2Eee', zIndex: 99,
     alignItems: 'center', justifyContent: 'center', gap: 6,
   },
-  restLabel: { fontSize: 14, fontWeight: '700', color: '#FFFFFF88', letterSpacing: 2 },
+  restLabel:     { fontSize: 14, fontWeight: '700', color: '#FFFFFF88', letterSpacing: 2 },
   restCountdown: { fontSize: 80, fontWeight: '800', color: '#4CD964' },
-  restSub: { fontSize: 16, color: '#FFFFFF88' },
-  restNext: { fontSize: 13, color: '#FFFFFF66', marginTop: 4 },
-  skipBtn: { marginTop: 16, paddingVertical: 12, paddingHorizontal: 40, borderRadius: 30, borderWidth: 1, borderColor: '#FFFFFF44' },
+  restSub:       { fontSize: 16, color: '#FFFFFF88' },
+  restNext:      { fontSize: 13, color: '#FFFFFF66', marginTop: 4 },
+  skipBtn:  { marginTop: 16, paddingVertical: 12, paddingHorizontal: 40, borderRadius: 30, borderWidth: 1, borderColor: '#FFFFFF44' },
   skipText: { color: '#FFFFFF', fontWeight: '700', letterSpacing: 1 },
-  mainBtn: { borderRadius: 999, height: 58, justifyContent: 'center', alignItems: 'center' },
+  mainBtn:     { borderRadius: 999, height: 58, justifyContent: 'center', alignItems: 'center' },
   mainBtnText: { color: '#111', fontSize: 15, fontWeight: '800', letterSpacing: 1 },
-  bottomHint: { textAlign: 'center', color: '#888', fontSize: 12, marginBottom: 12 },
+  bottomHint:  { textAlign: 'center', color: '#888', fontSize: 12, marginBottom: 12 },
   holdBtn: {
     height: 58, borderRadius: 999, borderWidth: 2,
     borderColor: 'rgba(255,149,0,0.3)', backgroundColor: '#FFFFFF',
@@ -625,28 +565,53 @@ const styles = StyleSheet.create({
   },
   holdBtnFill: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#FF9500', borderRadius: 999 },
   holdBtnText: { color: '#FF9500', fontWeight: '700', letterSpacing: 1, fontSize: 14 },
-  doneContainer: { padding: 20, gap: 16, paddingBottom: 40 },
-  doneTitle: { fontSize: 28, fontWeight: '800', color: '#1A1A2E', textAlign: 'center' },
-  doneSub: { fontSize: 15, color: '#888', textAlign: 'center' },
-  summaryBox: { backgroundColor: '#1A1A2E', borderRadius: 16, padding: 20, flexDirection: 'row', alignItems: 'center' },
-  summaryItem: { flex: 1, alignItems: 'center' },
-  summaryDivider: { width: 1, height: 36, backgroundColor: '#FFFFFF22' },
-  summaryLabel: { fontSize: 10, fontWeight: '600', color: '#FFFFFF88', letterSpacing: 0.5 },
-  summaryValue: { fontSize: 24, fontWeight: '800', color: '#FFFFFF', marginTop: 4 },
-  repResultTitle: { fontSize: 11, fontWeight: '700', color: '#999', letterSpacing: 0.8 },
+
+  // ── Done screen ───────────────────────────────────────────────────────────
+  doneContainer: { padding: 24, gap: 20, paddingBottom: 48, alignItems: 'center' },
+  trophyWrapper: {
+    width: 88, height: 88, borderRadius: 44,
+    backgroundColor: '#111', alignItems: 'center', justifyContent: 'center',
+    marginTop: 12,
+  },
+  doneTitle: {
+    fontSize: 36, fontWeight: '900', color: '#1A1A2E',
+    textAlign: 'center', lineHeight: 42,
+  },
+  doneSub: { fontSize: 14, color: '#888', textAlign: 'center', lineHeight: 20 },
+  durationBox: {
+    width: '100%', backgroundColor: '#F4F4F4',
+    borderRadius: 16, padding: 20, gap: 2,
+  },
+  durationLabel: { fontSize: 11, fontWeight: '700', color: '#AAA', letterSpacing: 0.8 },
+  durationValue: { fontSize: 36, fontWeight: '900', color: '#1A1A2E' },
+  durationUnit:  { fontSize: 14, color: '#888', fontWeight: '600' },
+  statRow:  { flexDirection: 'row', gap: 12, width: '100%' },
+  statBox:  { flex: 1, backgroundColor: '#F4F4F4', borderRadius: 16, padding: 16, gap: 2 },
+  statBoxEmoji: { fontSize: 22, marginBottom: 4 },
+  statBoxLabel: { fontSize: 10, fontWeight: '700', color: '#AAA', letterSpacing: 0.5 },
+  statBoxValue: { fontSize: 24, fontWeight: '900', color: '#1A1A2E' },
+  statBoxUnit:  { fontSize: 12, color: '#888', fontWeight: '500' },
+  sectionTitle: {
+    alignSelf: 'flex-start',
+    fontSize: 11, fontWeight: '700', color: '#999', letterSpacing: 0.8,
+  },
   repResultCard: {
-    backgroundColor: '#FFFFFF', borderRadius: 14, padding: 14, borderLeftWidth: 4, gap: 10,
-    shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6, elevation: 2,
+    width: '100%',
+    backgroundColor: '#F9F9F9', borderRadius: 14, padding: 14,
+    borderLeftWidth: 4, gap: 10,
   },
   repResultHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  repResultNum: { fontSize: 14, fontWeight: '800', color: '#1A1A2E' },
-  repResultBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
-  repResultBadgeText: { fontSize: 11, fontWeight: '700' },
+  repResultNum:    { fontSize: 14, fontWeight: '800', color: '#1A1A2E' },
+  hitBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
+  hitBadgeText: { fontSize: 11, fontWeight: '700' },
   repResultStats: { flexDirection: 'row', justifyContent: 'space-between' },
-  repResultStat: { alignItems: 'center', gap: 2 },
-  repResultStatLabel: { fontSize: 10, fontWeight: '600', color: '#AAA', letterSpacing: 0.5 },
-  repResultStatValue: { fontSize: 16, fontWeight: '800', color: '#1A1A2E' },
-  repResultStatTarget: { fontSize: 10, color: '#BBB' },
-  doneBtn: { backgroundColor: '#1A1A2E', borderRadius: 40, paddingVertical: 16, alignItems: 'center' },
-  doneBtnText: { color: '#FFFFFF', fontWeight: '800', fontSize: 16 },
+  repResultStat:  { alignItems: 'center', gap: 2 },
+  repStatLabel:   { fontSize: 10, fontWeight: '600', color: '#AAA', letterSpacing: 0.5 },
+  repStatValue:   { fontSize: 15, fontWeight: '800', color: '#1A1A2E' },
+  repStatTarget:  { fontSize: 10, color: '#BBB' },
+  doneBtn: {
+    width: '100%', backgroundColor: '#63EA7B',
+    borderRadius: 40, paddingVertical: 16, alignItems: 'center',
+  },
+  doneBtnText: { color: '#111', fontWeight: '800', fontSize: 16 },
 });

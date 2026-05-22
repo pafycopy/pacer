@@ -36,7 +36,7 @@ export type WorkoutFormValues = {
   selectedExercises?: Array<{
     id: string;
     name: string;
-    sets: Array<{ set: number; reps: string; kg: string }>;
+    sets: Array<{ set: number; reps: string; }>;
   }>;
 };
 

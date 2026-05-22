@@ -30,10 +30,7 @@ const BEEP_SOUND    = require('@/assets/sounds/success.mp3');
 export default function RunningTracker() {
   const router = useRouter();
   const { uid, dateKey, workoutType, workoutName } = useLocalSearchParams<{
-    uid: string;
-    dateKey: string;
-    workoutType: string;
-    workoutName: string;
+    uid: string; dateKey: string; workoutType: string; workoutName: string;
   }>();
 
   const player = useAudioPlayer(BEEP_SOUND);
@@ -45,37 +42,28 @@ export default function RunningTracker() {
   const [isHolding,   setIsHolding]   = useState(false);
   const [finalStats,  setFinalStats]  = useState<{ dist: number; time: number; pace: string } | null>(null);
 
-  const subscription    = useRef<any>(null);
-  const timerRef        = useRef<any>(null);
-  const holdTimeout     = useRef<any>(null);
-  const lastLocationRef = useRef<any>(null);
-  const isMovingRef     = useRef<boolean>(false);
-  const lastAnnouncedKm = useRef<number>(0);
+  const subscription      = useRef<any>(null);
+  const timerRef          = useRef<any>(null);
+  const holdTimeout       = useRef<any>(null);
+  const lastLocationRef   = useRef<any>(null);
+  const isMovingRef       = useRef<boolean>(false);
+  const lastAnnouncedKm   = useRef<number>(0);
+  const totalDistRef      = useRef<number>(0);
+  const timeRef           = useRef<number>(0);
+  const movingTimeRef     = useRef<number>(0);
 
-  // Refs untuk snapshot saat finish (hindari stale closure)
-  const totalDistRef  = useRef<number>(0);
-  const timeRef       = useRef<number>(0);
-  const movingTimeRef = useRef<number>(0);
+  useEffect(() => { totalDistRef.current  = totalDist;  }, [totalDist]);
+  useEffect(() => { timeRef.current       = time;       }, [time]);
+  useEffect(() => { movingTimeRef.current = movingTime; }, [movingTime]);
 
-  useEffect(() => { totalDistRef.current  = totalDist;   }, [totalDist]);
-  useEffect(() => { timeRef.current       = time;        }, [time]);
-  useEffect(() => { movingTimeRef.current = movingTime;  }, [movingTime]);
-
-  // ─── Hook finish ───────────────────────────────────────────────────────────
   const { finish } = useFinishWorkout(
-    dateKey,
-    uid,
-    [timerRef],
-    subscription,
-    {
-      hasOwnDoneScreen: true,
-      onAfterSave: () => setStatus('done'),
-    },
+    dateKey, uid, [timerRef], subscription,
+    { hasOwnDoneScreen: true, onAfterSave: () => setStatus('done') },
   );
 
   const holdProgress = useSharedValue(0);
 
-  // Timer
+  // ── Timer ──────────────────────────────────────────────────────────────────
   useEffect(() => {
     if (status === 'running') {
       timerRef.current = setInterval(() => {
@@ -88,7 +76,7 @@ export default function RunningTracker() {
     return () => clearInterval(timerRef.current);
   }, [status]);
 
-  // Cek km milestone
+  // ── Km milestone ──────────────────────────────────────────────────────────
   useEffect(() => {
     const kmReached = Math.floor(totalDist);
     if (kmReached > 0 && kmReached > lastAnnouncedKm.current) {
@@ -125,6 +113,16 @@ export default function RunningTracker() {
     return `${m}:${s < 10 ? '0' : ''}${s}`;
   };
 
+  // Format durasi untuk done screen: "45 Menit" atau "1 Jam 20 Menit"
+  const formatDuration = (seconds: number) => {
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = seconds % 60;
+    if (h > 0) return `${h} Jam ${m} Menit`;
+    if (m > 0) return `${m} Menit ${s > 0 ? `${s} Detik` : ''}`.trim();
+    return `${s} Detik`;
+  };
+
   const calcPace = (dist: number, mTime: number): string => {
     if (dist === 0 || mTime === 0) return '--:--';
     const sec = mTime / dist;
@@ -133,24 +131,14 @@ export default function RunningTracker() {
 
   const startLocationWatch = async () => {
     subscription.current = await Location.watchPositionAsync(
-      {
-        accuracy:         Location.Accuracy.BestForNavigation,
-        timeInterval:     1000,
-        distanceInterval: 5,
-      },
+      { accuracy: Location.Accuracy.BestForNavigation, timeInterval: 1000, distanceInterval: 5 },
       (loc) => {
         const newCoord = loc.coords;
         const speed    = newCoord.speed ?? 0;
         const accuracy = newCoord.accuracy ?? 999;
-
         isMovingRef.current = speed >= MIN_SPEED_MS;
-
         if (accuracy > 15) return;
-        if (speed < MIN_SPEED_MS) {
-          lastLocationRef.current = newCoord;
-          return;
-        }
-
+        if (speed < MIN_SPEED_MS) { lastLocationRef.current = newCoord; return; }
         setTotalDist((prev) => {
           const last = lastLocationRef.current;
           if (last) {
@@ -176,8 +164,8 @@ export default function RunningTracker() {
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } else if (status === 'running') {
       subscription.current?.remove();
-      subscription.current  = null;
-      isMovingRef.current   = false;
+      subscription.current    = null;
+      isMovingRef.current     = false;
       lastLocationRef.current = null;
       setStatus('paused');
     } else {
@@ -187,28 +175,17 @@ export default function RunningTracker() {
   };
 
   const handleFinish = () => {
-    // Snapshot nilai sebelum di-reset oleh hook
-    const snapDist  = totalDistRef.current;
-    const snapTime  = timeRef.current;
-    const snapPace  = calcPace(snapDist, movingTimeRef.current);
-
+    const snapDist = totalDistRef.current;
+    const snapTime = timeRef.current;
+    const snapPace = calcPace(snapDist, movingTimeRef.current);
     setFinalStats({ dist: snapDist, time: snapTime, pace: snapPace });
-
-    finish({
-      actualDistance: snapDist,
-      actualDuration: snapTime,
-      actualPace:     snapPace,
-      completedAt:    Date.now(),
-    });
+    finish({ actualDistance: snapDist, actualDuration: snapTime, actualPace: snapPace, completedAt: Date.now() });
   };
 
   const handleDiscard = () => {
     Alert.alert('Keluar dari latihan?', 'Progress latihan akan hilang.', [
       { text: 'Batal', style: 'cancel' },
-      {
-        text: 'Keluar', style: 'destructive',
-        onPress: () => { subscription.current?.remove(); router.back(); },
-      },
+      { text: 'Keluar', style: 'destructive', onPress: () => { subscription.current?.remove(); router.back(); } },
     ]);
   };
 
@@ -236,119 +213,116 @@ export default function RunningTracker() {
     opacity: isHolding ? 0.6 + holdProgress.value * 0.4 : 1,
   }));
 
-  // ─── Done screen ──────────────────────────────────────────────────────────
+  // ─── DONE SCREEN ──────────────────────────────────────────────────────────
   if (status === 'done' && finalStats) {
     return (
-      <SafeAreaView style={styles.safeArea}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()}>
-            <Ionicons name="chevron-back" size={24} color="#111" />
-          </TouchableOpacity>
-          <Text style={styles.workoutName}>{workoutName || 'RUNNING'}</Text>
-          <View style={{ width: 24 }} />
-        </View>
+      <SafeAreaView style={st.safeArea}>
+        <ScrollView contentContainerStyle={st.doneScroll} showsVerticalScrollIndicator={false}>
 
-        <ScrollView contentContainerStyle={styles.doneContainer}>
-          <Text style={styles.doneTitle}>🎉 Sesi Selesai!</Text>
-          <Text style={styles.doneSub}>{workoutName || 'Running'}</Text>
+          {/* Trophy icon */}
+          <View style={st.trophyWrap}>
+            <Ionicons name="trophy" size={36} color="#5BFF7A" />
+          </View>
 
-          {/* 3 stat utama */}
-          <View style={styles.statsGrid}>
-            <View style={styles.statBig}>
-              <Text style={styles.statBigLabel}>TOTAL JARAK</Text>
-              <Text style={styles.statBigValue}>{finalStats.dist.toFixed(2)}</Text>
-              <Text style={styles.statBigUnit}>km</Text>
+          {/* Judul */}
+          <Text style={st.doneTitle}>Workout Selesai!</Text>
+          <Text style={st.doneSub}>Pelan tidak apa-apa, yang penting konsisten</Text>
+
+          {/* Durasi total — card besar */}
+          <View style={st.durationCard}>
+            <Text style={st.durationLabel}>DURASI TOTAL</Text>
+            <Text style={st.durationValue}>{formatDuration(finalStats.time)}</Text>
+          </View>
+
+          {/* 2 stat card: Jarak & Pace */}
+          <View style={st.statsRow}>
+            <View style={st.statCard}>
+              <Ionicons name="navigate-outline" size={18} color="#5BFF7A" />
+              <Text style={st.statLabel}>JARAK</Text>
+              <Text style={st.statValue}>{finalStats.dist.toFixed(2)}</Text>
+              <Text style={st.statUnit}>km</Text>
             </View>
-
-            <View style={styles.statsRow}>
-              <View style={styles.statCard}>
-                <Text style={styles.statLabel}>DURASI</Text>
-                <Text style={styles.statValue}>{formatTime(finalStats.time)}</Text>
-                <Text style={styles.statSub}>MM:SS</Text>
-              </View>
-              <View style={styles.statCard}>
-                <Text style={styles.statLabel}>AVG PACE</Text>
-                <Text style={styles.statValue}>{finalStats.pace}</Text>
-                <Text style={styles.statSub}>MIN/KM</Text>
-              </View>
+            <View style={st.statCard}>
+              <Ionicons name="speedometer-outline" size={18} color="#4D7CFE" />
+              <Text style={st.statLabel}>AVG PACE</Text>
+              <Text style={st.statValue}>{finalStats.pace}</Text>
+              <Text style={st.statUnit}>min/km</Text>
             </View>
           </View>
 
-          <TouchableOpacity style={styles.doneBtn} onPress={() => router.back()}>
-            <Text style={styles.doneBtnText}>Selesai</Text>
+          {/* Tombol kembali */}
+          <TouchableOpacity style={st.doneBtn} onPress={() => router.back()} activeOpacity={0.88}>
+            <Text style={st.doneBtnText}>Kembali ke Dashboard</Text>
+            <Ionicons name="arrow-forward" size={18} color="#111" />
           </TouchableOpacity>
+
         </ScrollView>
       </SafeAreaView>
     );
   }
 
-  // ─── Running screen ───────────────────────────────────────────────────────
+  // ─── RUNNING SCREEN ───────────────────────────────────────────────────────
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={styles.header}>
+    <SafeAreaView style={st.safeArea}>
+      <View style={st.header}>
         <TouchableOpacity onPress={handleDiscard}>
           <Ionicons name="chevron-back" size={24} color="#111" />
         </TouchableOpacity>
-        <View style={styles.headerCenter}>
-          <Text style={styles.workoutName}>{workoutName || 'RUNNING'}</Text>
+        <View style={st.headerCenter}>
+          <Text style={st.workoutName}>{workoutName || 'RUNNING'}</Text>
         </View>
       </View>
 
-      <View style={styles.container}>
+      <View style={st.container}>
         <View>
           {status !== 'idle' && (
-            <View style={[styles.badge, { backgroundColor: status === 'running' ? '#4CD964' : '#FF9500' }]}>
-              <Text style={styles.badgeText}>
-                {status === 'running'
-                  ? isMovingRef.current ? 'TRACKING' : 'DIAM'
-                  : 'PAUSED'}
+            <View style={[st.badge, { backgroundColor: status === 'running' ? '#4CD964' : '#FF9500' }]}>
+              <Text style={st.badgeText}>
+                {status === 'running' ? (isMovingRef.current ? 'TRACKING' : 'DIAM') : 'PAUSED'}
               </Text>
             </View>
           )}
         </View>
 
         <View>
-          <Text style={styles.label}>DISTANCE</Text>
-          <Text style={styles.distance}>
+          <Text style={st.label}>DISTANCE</Text>
+          <Text style={st.distance}>
             {totalDist.toFixed(2)}
-            <Text style={styles.unit}> KM</Text>
+            <Text style={st.unit}> KM</Text>
           </Text>
-
-          <View style={styles.statsRow}>
-            <View style={styles.statCard}>
-              <Text style={styles.statLabel}>DURATION</Text>
-              <Text style={styles.statValue}>{formatTime(time)}</Text>
-              <Text style={styles.statSub}>MM:SS</Text>
+          <View style={st.runStatsRow}>
+            <View style={st.runStatCard}>
+              <Text style={st.statLabel}>DURATION</Text>
+              <Text style={st.statValue}>{formatTime(time)}</Text>
+              <Text style={st.statUnit}>MM:SS</Text>
             </View>
-            <View style={styles.statCard}>
-              <Text style={styles.statLabel}>AVG PACE</Text>
-              <Text style={styles.statValue}>{calcPace(totalDist, movingTime)}</Text>
-              <Text style={styles.statSub}>MIN/KM</Text>
+            <View style={st.runStatCard}>
+              <Text style={st.statLabel}>AVG PACE</Text>
+              <Text style={st.statValue}>{calcPace(totalDist, movingTime)}</Text>
+              <Text style={st.statUnit}>MIN/KM</Text>
             </View>
           </View>
         </View>
 
         <View>
           {status !== 'idle' && (
-            <Text style={styles.bottomText}>
+            <Text style={st.bottomText}>
               {isHolding ? 'Tahan untuk berhenti...' : 'Tubuh Anda sedang beradaptasi'}
             </Text>
           )}
-
           <TouchableOpacity
-            style={[styles.mainBtn, { backgroundColor: status === 'paused' ? '#FFB84D' : '#63EA7B' }]}
+            style={[st.mainBtn, { backgroundColor: status === 'paused' ? '#FFB84D' : '#63EA7B' }]}
             onPress={handleMainButton}
           >
-            <Text style={styles.mainBtnText}>
+            <Text style={st.mainBtnText}>
               {status === 'idle' ? 'START' : status === 'running' ? '⏸ PAUSE' : '▶ RESUME'}
             </Text>
           </TouchableOpacity>
-
           {status !== 'idle' && (
             <Pressable onPressIn={handleHoldStart} onPressOut={handleHoldEnd}>
-              <Animated.View style={[styles.finishBtn, animatedBorderStyle]}>
-                <Animated.View style={[styles.finishBtnFill, animatedFillStyle]} />
-                <Animated.Text style={[styles.finishText, animatedTextStyle]}>
+              <Animated.View style={[st.finishBtn, animatedBorderStyle]}>
+                <Animated.View style={[st.finishBtnFill, animatedFillStyle]} />
+                <Animated.Text style={[st.finishText, animatedTextStyle]}>
                   {isHolding ? '🔴  BERHENTI...' : 'HOLD TO STOP'}
                 </Animated.Text>
               </Animated.View>
@@ -360,8 +334,48 @@ export default function RunningTracker() {
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea:    { flex: 1, backgroundColor: '#F3F5F4' },
+const st = StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: '#F3F4F6' },
+
+  // ── Done screen ────────────────────────────────────────────────────────────
+  doneScroll: {
+    padding: 24, gap: 16, paddingBottom: 48, alignItems: 'center',
+  },
+  trophyWrap: {
+    width: 88, height: 88, borderRadius: 44,
+    backgroundColor: '#111', alignItems: 'center', justifyContent: 'center',
+    marginTop: 12,
+  },
+  doneTitle: {
+    fontSize: 32, fontWeight: '800', color: '#111',
+    textAlign: 'center', marginTop: 4,
+  },
+  doneSub: {
+    fontSize: 14, color: '#777', textAlign: 'center',
+    lineHeight: 22, marginTop: -4,
+  },
+  durationCard: {
+    width: '100%', backgroundColor: '#FFF',
+    borderRadius: 22, padding: 22, gap: 6,
+  },
+  durationLabel: { fontSize: 11, fontWeight: '700', color: '#888', letterSpacing: 0.6 },
+  durationValue: { fontSize: 34, fontWeight: '800', color: '#111' },
+  statsRow: { flexDirection: 'row', gap: 12, width: '100%' },
+  statCard: {
+    flex: 1, backgroundColor: '#FFF', borderRadius: 20,
+    padding: 16, gap: 4,
+  },
+  statLabel: { fontSize: 10, fontWeight: '700', color: '#888', marginTop: 8, letterSpacing: 0.5 },
+  statValue: { fontSize: 26, fontWeight: '800', color: '#111' },
+  statUnit:  { fontSize: 11, color: '#AAA', fontWeight: '500' },
+  doneBtn: {
+    width: '100%', backgroundColor: '#5BFF7A',
+    paddingVertical: 18, borderRadius: 40, marginTop: 8,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+  },
+  doneBtnText: { fontSize: 16, fontWeight: '800', color: '#111' },
+
+  // ── Running screen ─────────────────────────────────────────────────────────
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 20, paddingTop: 0, paddingBottom: 8,
@@ -374,11 +388,8 @@ const styles = StyleSheet.create({
   label:        { textAlign: 'center', fontSize: 13, letterSpacing: 1.5, color: '#666', marginBottom: 8 },
   distance:     { textAlign: 'center', fontSize: 58, fontWeight: '900', color: '#000', lineHeight: 64 },
   unit:         { fontSize: 28, fontWeight: '700', color: '#555' },
-  statsRow:     { flexDirection: 'row', justifyContent: 'space-between', marginTop: 12, gap: 12 },
-  statCard:     { flex: 1, backgroundColor: '#F8F8F8', borderRadius: 14, paddingVertical: 18, alignItems: 'center' },
-  statLabel:    { fontSize: 12, color: '#666', fontWeight: '600', letterSpacing: 1 },
-  statValue:    { fontSize: 22, fontWeight: '900', color: '#000', marginTop: 6 },
-  statSub:      { marginTop: 2, fontSize: 11, color: '#666', fontWeight: '500' },
+  runStatsRow:  { flexDirection: 'row', justifyContent: 'space-between', marginTop: 12, gap: 12 },
+  runStatCard:  { flex: 1, backgroundColor: '#F8F8F8', borderRadius: 14, paddingVertical: 18, alignItems: 'center' },
   bottomText:   { textAlign: 'center', color: '#666', marginBottom: 18, fontSize: 13 },
   mainBtn:      { borderRadius: 999, height: 58, justifyContent: 'center', alignItems: 'center' },
   mainBtnText:  { color: '#111', fontSize: 15, fontWeight: '800', letterSpacing: 1 },
@@ -386,30 +397,11 @@ const styles = StyleSheet.create({
     marginTop: 12, height: 58, borderRadius: 999,
     borderWidth: 2, borderColor: 'rgba(239,68,68,0.3)',
     backgroundColor: '#FFFFFF',
-    justifyContent: 'center', alignItems: 'center',
-    overflow: 'hidden',
+    justifyContent: 'center', alignItems: 'center', overflow: 'hidden',
   },
   finishBtnFill: {
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
     backgroundColor: '#EF4444', borderRadius: 999,
   },
   finishText: { color: '#EF4444', fontWeight: '700', letterSpacing: 1, fontSize: 14 },
-
-  // Done screen
-  doneContainer: { padding: 20, gap: 20, paddingBottom: 40 },
-  doneTitle:     { fontSize: 28, fontWeight: '800', color: '#1A1A2E', textAlign: 'center' },
-  doneSub:       { fontSize: 15, color: '#888', textAlign: 'center', marginTop: -8 },
-  statsGrid:     { gap: 12 },
-  statBig: {
-    backgroundColor: '#1A1A2E', borderRadius: 20,
-    paddingVertical: 28, alignItems: 'center',
-  },
-  statBigLabel:  { fontSize: 11, fontWeight: '700', color: '#FFFFFF88', letterSpacing: 1 },
-  statBigValue:  { fontSize: 52, fontWeight: '900', color: '#FFFFFF', lineHeight: 60, marginTop: 4 },
-  statBigUnit:   { fontSize: 18, fontWeight: '600', color: '#FFFFFF88' },
-  doneBtn: {
-    backgroundColor: '#1A1A2E', borderRadius: 40,
-    paddingVertical: 16, alignItems: 'center', marginTop: 8,
-  },
-  doneBtnText: { color: '#FFFFFF', fontWeight: '800', fontSize: 16 },
 });

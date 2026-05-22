@@ -367,7 +367,7 @@ export default function TodayWorkoutCard({
         ) : (
           <TouchableOpacity style={styles.startButton} onPress={onStartPress} activeOpacity={0.85}>
             <Text style={styles.startButtonIcon}>▶</Text>
-            <Text style={styles.startButtonText}>Start Running</Text>
+            <Text style={styles.startButtonText}>Start Training</Text>
           </TouchableOpacity>
         )}
       </View>

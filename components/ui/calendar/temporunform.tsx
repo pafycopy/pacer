@@ -16,6 +16,7 @@ export type TempoRunValues = {
   distance: string;
   pace: string;
   sets: string;
+  restTime: string;
   reps: string;
   weight: string;
   duration: { hour: number; min: number; sec: number };
@@ -37,6 +38,7 @@ const makeDefault = (): TempoRunValues => ({
   // kompatibilitas
   distance: '',
   pace: '',
+  restTime: '',
   sets: '',
   reps: '',
   weight: '',

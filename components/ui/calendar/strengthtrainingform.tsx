@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
-  StyleSheet, ScrollView, SafeAreaView,
+  StyleSheet, ScrollView, SafeAreaView, StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import {
   EXERCISES, CATEGORY_CONFIG, CATEGORIES,
-  ExerciseCategory, Exercise, SelectedExercise, ExerciseSet,
+  ExerciseCategory, Exercise, SelectedExercise,
+  makeDefaultSet, getSetsLabel,
 } from '@/constants/strengthdata';
 import { WorkoutFormValues } from '@/components/ui/calendar/workoutformscreen';
 
@@ -16,12 +17,89 @@ type Props = {
   onSave: (values: WorkoutFormValues) => void;
 };
 
-const makeSet = (setNum: number): ExerciseSet => ({
-  set: setNum,
-  reps: '10',
-  kg: '0',
-});
+// ─── Preview Screen ───────────────────────────────────────────────────────────
+type PreviewExercise = {
+  id: string; name: string; setsLabel: string; inputType: 'reps' | 'duration';
+};
 
+type IntensityLevel = 'Light' | 'Moderate' | 'High';
+
+const getIntensity = (totalSets: number): { label: IntensityLevel; color: string } => {
+  if (totalSets <= 6)  return { label: 'Light',    color: '#007AFF' };
+  if (totalSets <= 12) return { label: 'Moderate', color: '#FF9500' };
+  return               { label: 'High',     color: '#FF3B30' };
+};
+
+type PreviewProps = {
+  badge: string; programTitle: string; durationMins: number;
+  totalSets: number; exercises: PreviewExercise[];
+  quote?: string; onBack: () => void; onStart: () => void;
+};
+
+function WorkoutPreview({ badge, programTitle, durationMins, totalSets, exercises, quote, onBack, onStart }: PreviewProps) {
+  const intensity = getIntensity(totalSets);
+  return (
+    <SafeAreaView style={ps.safe}>
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+      <View style={ps.header}>
+        <TouchableOpacity onPress={onBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+          <Ionicons name="arrow-back" size={22} color="#1A1A2E" />
+        </TouchableOpacity>
+        <Text style={ps.headerTitle}>Strength Training</Text>
+        <View style={{ width: 22 }} />
+      </View>
+      <ScrollView contentContainerStyle={ps.scroll} showsVerticalScrollIndicator={false}>
+        <View style={ps.heroCard}>
+          <View style={ps.badge}><Text style={ps.badgeText}>{badge}</Text></View>
+          <Text style={ps.heroTitle}>{programTitle}</Text>
+        </View>
+        <View style={ps.statsRow}>
+          <View style={ps.statItem}>
+            <Text style={ps.statLabel}>DURATION</Text>
+            <Text style={ps.statValue}>{durationMins} Mins</Text>
+          </View>
+          <View style={ps.statDivider} />
+          <View style={ps.statItem}>
+            <Text style={ps.statLabel}>INTENSITY</Text>
+            <Text style={[ps.statValue, { color: intensity.color }]}>{intensity.label}</Text>
+          </View>
+        </View>
+        <View style={ps.exerciseList}>
+          {exercises.map((ex) => (
+            <View key={ex.id} style={ps.exerciseCard}>
+              <View style={ps.thumbnail}>
+                <Ionicons name="barbell-outline" size={22} color="#CCC" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={ps.exerciseName}>{ex.name}</Text>
+                <Text style={ps.exerciseSets}>{ex.setsLabel}</Text>
+              </View>
+              {/* Badge reps vs durasi */}
+              <View style={[ps.typeBadge, ex.inputType === 'duration' && ps.typeBadgeDuration]}>
+                <Ionicons
+                  name={ex.inputType === 'duration' ? 'timer-outline' : 'repeat-outline'}
+                  size={12}
+                  color={ex.inputType === 'duration' ? '#007AFF' : '#FF6B35'}
+                />
+                <Text style={[ps.typeBadgeText, ex.inputType === 'duration' && { color: '#007AFF' }]}>
+                  {ex.inputType === 'duration' ? 'Waktu' : 'Reps'}
+                </Text>
+              </View>
+            </View>
+          ))}
+        </View>
+        {!!quote && <Text style={ps.quote}>"{quote}"</Text>}
+      </ScrollView>
+      <View style={ps.footer}>
+        <TouchableOpacity style={ps.startBtn} onPress={onStart} activeOpacity={0.88}>
+          <Text style={ps.startBtnText}>Simpan Latihan</Text>
+        </TouchableOpacity>
+      </View>
+    </SafeAreaView>
+  );
+}
+
+// ─── Form Screen ──────────────────────────────────────────────────────────────
 export default function StrengthTrainingForm({ initialValues, onBack, onSave }: Props) {
   const [activeCategory, setActiveCategory] = useState<ExerciseCategory>(
     (initialValues?.trainingCategory as ExerciseCategory) ?? 'Strength'
@@ -38,13 +116,12 @@ export default function StrengthTrainingForm({ initialValues, onBack, onSave }: 
   });
   const [notes, setNotes] = useState(initialValues?.notes ?? '');
   const [error, setError] = useState('');
+  const [showPreview, setShowPreview] = useState(false);
+  const [pendingValues, setPendingValues] = useState<WorkoutFormValues | null>(null);
   const isEditing = !!initialValues;
 
-  // Saat ganti category, clear exercise yang dipilih
   const handleCategoryChange = (cat: ExerciseCategory) => {
-    setActiveCategory(cat);
-    setSelectedExercises([]);
-    setError('');
+    setActiveCategory(cat); setSelectedExercises([]); setError('');
   };
 
   const toggleExercise = (exercise: Exercise) => {
@@ -52,7 +129,7 @@ export default function StrengthTrainingForm({ initialValues, onBack, onSave }: 
     setSelectedExercises((prev) => {
       const exists = prev.find((e) => e.exercise.id === exercise.id);
       if (exists) return prev.filter((e) => e.exercise.id !== exercise.id);
-      return [...prev, { exercise, sets: [makeSet(1)], expanded: true }];
+      return [...prev, { exercise, sets: [makeDefaultSet(exercise, 1)], expanded: true }];
     });
   };
 
@@ -64,14 +141,11 @@ export default function StrengthTrainingForm({ initialValues, onBack, onSave }: 
     );
   };
 
-  const updateSet = (exerciseId: string, setIndex: number, field: 'reps', value: string) => {
+  const updateSet = (exerciseId: string, setIndex: number, field: 'reps' | 'duration' | 'kg', value: string) => {
     setSelectedExercises((prev) =>
       prev.map((e) => {
         if (e.exercise.id !== exerciseId) return e;
-        const newSets = e.sets.map((s, i) =>
-          i === setIndex ? { ...s, [field]: value } : s
-        );
-        return { ...e, sets: newSets };
+        return { ...e, sets: e.sets.map((s, i) => i === setIndex ? { ...s, [field]: value } : s) };
       })
     );
   };
@@ -80,7 +154,8 @@ export default function StrengthTrainingForm({ initialValues, onBack, onSave }: 
     setSelectedExercises((prev) =>
       prev.map((e) => {
         if (e.exercise.id !== exerciseId) return e;
-        return { ...e, sets: [...e.sets, makeSet(e.sets.length + 1)] };
+        const exercise = e.exercise;
+        return { ...e, sets: [...e.sets, makeDefaultSet(exercise, e.sets.length + 1)] };
       })
     );
   };
@@ -90,135 +165,130 @@ export default function StrengthTrainingForm({ initialValues, onBack, onSave }: 
       prev.map((e) => {
         if (e.exercise.id !== exerciseId) return e;
         if (e.sets.length <= 1) return e;
-        const newSets = e.sets
-          .filter((_, i) => i !== setIndex)
-          .map((s, i) => ({ ...s, set: i + 1 }));
-        return { ...e, sets: newSets };
+        return { ...e, sets: e.sets.filter((_, i) => i !== setIndex).map((s, i) => ({ ...s, set: i + 1 })) };
       })
     );
   };
 
-  const handleSave = () => {
-    if (selectedExercises.length === 0) {
-      setError('Pilih minimal 1 exercise');
-      return;
-    }
-    const totalSets = selectedExercises.reduce((acc, e) => acc + e.sets.length, 0);
-    onSave({
+  const totalSets = selectedExercises.reduce((acc, e) => acc + e.sets.length, 0);
+
+  const handlePreview = () => {
+    if (selectedExercises.length === 0) { setError('Pilih minimal 1 exercise'); return; }
+    const values: WorkoutFormValues = {
       workoutType: 'Strength Training',
       workoutName: `${activeCategory} Session`,
-      distance: '',
-      pace: '',
-      sets: String(totalSets),
-      reps: '',
-      weight: '',
+      distance: '', pace: '', sets: String(totalSets), reps: '',
+      restTime: '60', weight: '',
       duration: { hour: 0, min: 0, sec: 0 },
-      notes,
-      trainingCategory: activeCategory,
+      notes, trainingCategory: activeCategory,
       selectedExercises: selectedExercises.map((e) => ({
         id: e.exercise.id,
         name: e.exercise.name,
-        sets: e.sets,
+        inputType: e.exercise.inputType,  // ← kirim inputType ke tracker
+        sets: e.sets.map((s) => ({ set: s.set, reps: s.reps, duration: s.duration, kg: s.kg })),
       })),
-    });
+    };
+    setPendingValues(values); setShowPreview(true);
   };
 
+  const handleStart = () => { if (pendingValues) onSave(pendingValues); };
+
+  // ── Preview screen ─────────────────────────────────────────────────────────
+  // ── Preview screen ─────────────────────────────────────────────────────────
+  if (showPreview && pendingValues) {
+    const estimateMins = Math.round(totalSets * 1.5);
+    const previewExercises: PreviewExercise[] = selectedExercises.map((e) => ({
+      id: e.exercise.id,
+      name: e.exercise.name,
+      setsLabel: getSetsLabel(e.exercise, e.sets),
+      inputType: e.exercise.inputType,
+    }));
+    return (
+      <WorkoutPreview
+        badge={activeCategory.toUpperCase()}
+        programTitle={`${activeCategory} Session`}
+        durationMins={estimateMins}
+        totalSets={totalSets}
+        exercises={previewExercises}
+        quote="Istirahat juga bagian dari progres"
+        onBack={() => setShowPreview(false)}
+        onStart={handleStart}
+      />
+    );
+  }
+
+  // ── Form screen ────────────────────────────────────────────────────────────
   const exercisesInCategory = EXERCISES.filter((e) => e.category === activeCategory);
   const grouped = exercisesInCategory.reduce<Record<string, Exercise[]>>((acc, ex) => {
     const key = ex.group ?? activeCategory;
     if (!acc[key]) acc[key] = [];
-    acc[key].push(ex);
-    return acc;
+    acc[key].push(ex); return acc;
   }, {});
-
   const catConfig = CATEGORY_CONFIG[activeCategory];
-  const totalSets = selectedExercises.reduce((acc, e) => acc + e.sets.length, 0);
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={styles.header}>
+    <SafeAreaView style={fs.safeArea}>
+      <View style={fs.header}>
         <TouchableOpacity onPress={onBack} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Ionicons name="arrow-back" size={22} color="#1A1A2E" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>STRENGTH TRAINING</Text>
+        <Text style={fs.headerTitle}>STRENGTH TRAINING</Text>
         <View style={{ width: 22 }} />
       </View>
 
-      <ScrollView
-        contentContainerStyle={styles.form}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
-        {/* Training Context — Radio Button */}
-        <Text style={styles.sectionLabel}>TRAINING CONTEXT</Text>
-        <View style={styles.contextList}>
+      <ScrollView contentContainerStyle={fs.form} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+        <Text style={fs.sectionLabel}>TRAINING CONTEXT</Text>
+        <View style={fs.contextList}>
           {CATEGORIES.map((cat) => {
             const cfg = CATEGORY_CONFIG[cat];
             const active = activeCategory === cat;
             return (
-              <TouchableOpacity
-                key={cat}
-                style={[styles.contextItem, active && styles.contextItemActive]}
-                onPress={() => handleCategoryChange(cat)}
-                activeOpacity={0.75}
-              >
-                {/* Radio Button */}
-                <View style={[styles.radio, active && { borderColor: '#2E7D32' }]}>
-                  {active && <View style={styles.radioDot} />}
+              <TouchableOpacity key={cat} style={[fs.contextItem, active && fs.contextItemActive]} onPress={() => handleCategoryChange(cat)} activeOpacity={0.75}>
+                <View style={[fs.radio, active && { borderColor: '#2E7D32' }]}>
+                  {active && <View style={fs.radioDot} />}
                 </View>
-                {/* Label */}
-                <Text style={[styles.contextLabel, active && styles.contextLabelActive]}>
-                  {cfg.icon} {cat}
-                </Text>
+                <Text style={[fs.contextLabel, active && fs.contextLabelActive]}>{cfg.icon} {cat}</Text>
               </TouchableOpacity>
             );
           })}
         </View>
 
-        {/* Exercise List */}
-        <Text style={styles.sectionLabel}>EXERCISES</Text>
-        <View style={[styles.catDescBox, { borderLeftColor: catConfig.color }]}>
-          <Text style={[styles.catDescText, { color: catConfig.color }]}>{catConfig.desc}</Text>
+        <Text style={fs.sectionLabel}>EXERCISES</Text>
+        <View style={[fs.catDescBox, { borderLeftColor: catConfig.color }]}>
+          <Text style={[fs.catDescText, { color: catConfig.color }]}>{catConfig.desc}</Text>
         </View>
 
         {Object.entries(grouped).map(([groupName, exercises]) => (
-          <View key={groupName} style={styles.groupBlock}>
-            {exercises[0].group && (
-              <Text style={styles.groupTitle}>{groupName}</Text>
-            )}
-
+          <View key={groupName} style={fs.groupBlock}>
+            {exercises[0].group && <Text style={fs.groupTitle}>{groupName}</Text>}
             {exercises.map((exercise) => {
               const selected = isSelected(exercise.id);
               const selData = selectedExercises.find((e) => e.exercise.id === exercise.id);
-
+              const isDuration = exercise.inputType === 'duration';
               return (
                 <View key={exercise.id}>
                   <TouchableOpacity
-                    style={[
-                      styles.exerciseRow,
-                      selected && { borderColor: catConfig.color, backgroundColor: '#F9FFF9' },
-                    ]}
-                    onPress={() => toggleExercise(exercise)}
-                    activeOpacity={0.75}
+                    style={[fs.exerciseRow, selected && { borderColor: catConfig.color, backgroundColor: '#F9FFF9' }]}
+                    onPress={() => toggleExercise(exercise)} activeOpacity={0.75}
                   >
-                    <View style={styles.exerciseLeft}>
-                      <Ionicons name="reorder-three-outline" size={18} color="#BBB" style={{ marginRight: 8 }} />
-                      <Text style={[styles.exerciseName, selected && { color: '#1A1A2E', fontWeight: '700' }]}>
+                    <View style={fs.exerciseLeft}>
+                      {/* Ikon kecil penanda tipe */}
+                      <Ionicons
+                        name={isDuration ? 'timer-outline' : 'repeat-outline'}
+                        size={16} color={isDuration ? '#007AFF' : '#FF6B35'}
+                        style={{ marginRight: 8 }}
+                      />
+                      <Text style={[fs.exerciseName, selected && { color: '#1A1A2E', fontWeight: '700' }]}>
                         {exercise.name}
                       </Text>
                     </View>
-                    <View style={styles.exerciseRight}>
+                    <View style={fs.exerciseRight}>
                       {selected && selData && (
-                        <Text style={[styles.setsBadge, { color: catConfig.color }]}>
-                          {selData.sets.length} Sets
-                        </Text>
+                        <Text style={[fs.setsBadge, { color: catConfig.color }]}>{selData.sets.length} Sets</Text>
                       )}
                       {selected ? (
                         <TouchableOpacity onPress={() => toggleExpand(exercise.id)}>
-                          <Ionicons
-                            name={selData?.expanded ? 'chevron-up' : 'chevron-down'}
-                            size={18} color="#888"
-                          />
+                          <Ionicons name={selData?.expanded ? 'chevron-up' : 'chevron-down'} size={18} color="#888" />
                         </TouchableOpacity>
                       ) : (
                         <Ionicons name="add-circle-outline" size={20} color="#BBB" />
@@ -226,54 +296,42 @@ export default function StrengthTrainingForm({ initialValues, onBack, onSave }: 
                     </View>
                   </TouchableOpacity>
 
-                  {/* Set & Reps — tanpa KG */}
                   {selected && selData?.expanded && (
-                    <View style={styles.setsContainer}>
-                      {/* Header */}
-                      <View style={styles.setsHeader}>
-                        <Text style={[styles.setsHeaderCell, { width: 36 }]}>SET</Text>
-                        <Text style={[styles.setsHeaderCell, { flex: 1 }]}>REPETISI</Text>
-                        <View style={{ width: 28 }} />
+                    <View style={fs.setsContainer}>
+                      {/* Header kolom — berubah sesuai tipe */}
+                      <View style={fs.setsHeader}>
+                        <Text style={[fs.setsHeaderCell, { width: 36 }]}>SET</Text>
+                        <Text style={[fs.setsHeaderCell, { flex: 1 }]}>
+                          {isDuration ? 'DURASI (detik)' : 'REPETISI'}
+                        </Text>
+                        <View style={{ width: 44 }} />
                       </View>
 
                       {selData.sets.map((s, idx) => (
-                        <View key={idx} style={styles.setRow}>
-                          {/* Set Number */}
-                          <View style={[styles.setNumberBox, { backgroundColor: catConfig.color + '22' }]}>
-                            <Text style={[styles.setNumber, { color: catConfig.color }]}>{s.set}</Text>
+                        <View key={idx} style={fs.setRow}>
+                          <View style={[fs.setNumberBox, { backgroundColor: catConfig.color + '22' }]}>
+                            <Text style={[fs.setNumber, { color: catConfig.color }]}>{s.set}</Text>
                           </View>
-
-                          {/* Reps */}
-                          <View style={styles.setInputBox}>
+                          <View style={fs.setInputBox}>
                             <TextInput
-                              style={styles.setInput}
+                              style={fs.setInput}
                               keyboardType="number-pad"
-                              value={s.reps}
-                              onChangeText={(v) => updateSet(exercise.id, idx, 'reps', v)}
+                              value={isDuration ? s.duration : s.reps}
+                              onChangeText={(v) => updateSet(exercise.id, idx, isDuration ? 'duration' : 'reps', v)}
                             />
                           </View>
-
-                          {/* Delete Set */}
-                          <TouchableOpacity
-                            onPress={() => removeSet(exercise.id, idx)}
-                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                            disabled={selData.sets.length <= 1}
-                          >
-                            <Ionicons
-                              name="trash-outline" size={16}
-                              color={selData.sets.length <= 1 ? '#DDD' : '#FF3B30'}
-                            />
+                          {/* Satuan */}
+                          <Text style={fs.setUnitLabel}>{isDuration ? 'dtk' : 'reps'}</Text>
+                          {/* Hapus */}
+                          <TouchableOpacity onPress={() => removeSet(exercise.id, idx)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} disabled={selData.sets.length <= 1}>
+                            <Ionicons name="trash-outline" size={16} color={selData.sets.length <= 1 ? '#DDD' : '#FF3B30'} />
                           </TouchableOpacity>
                         </View>
                       ))}
 
-                      {/* Add Set */}
-                      <TouchableOpacity
-                        style={styles.addSetBtn}
-                        onPress={() => addSet(exercise.id)}
-                      >
+                      <TouchableOpacity style={fs.addSetBtn} onPress={() => addSet(exercise.id)}>
                         <Ionicons name="add" size={16} color={catConfig.color} />
-                        <Text style={[styles.addSetText, { color: catConfig.color }]}>Add Set</Text>
+                        <Text style={[fs.addSetText, { color: catConfig.color }]}>Add Set</Text>
                       </TouchableOpacity>
                     </View>
                   )}
@@ -283,171 +341,116 @@ export default function StrengthTrainingForm({ initialValues, onBack, onSave }: 
           </View>
         ))}
 
-        {error ? <Text style={styles.errorText}>{error}</Text> : null}
+        {error ? <Text style={fs.errorText}>{error}</Text> : null}
 
-        {/* Notes */}
-        <View style={styles.fieldGroup}>
-          <Text style={styles.fieldLabel}>NOTES</Text>
-          <TextInput
-            style={styles.textArea}
-            placeholder="Otot mana yang dilatih? Tingkat kelelahan?"
-            placeholderTextColor="#BBB"
-            multiline
-            numberOfLines={3}
-            value={notes}
-            onChangeText={setNotes}
-          />
+        <View style={fs.fieldGroup}>
+          <Text style={fs.fieldLabel}>NOTES</Text>
+          <TextInput style={fs.textArea} placeholder="Otot mana yang dilatih? Tingkat kelelahan?" placeholderTextColor="#BBB" multiline numberOfLines={3} value={notes} onChangeText={setNotes} />
         </View>
 
-        {/* Summary */}
         {selectedExercises.length > 0 && (
-          <View style={styles.summaryBox}>
-            <Text style={styles.summaryTitle}>RINGKASAN</Text>
-            <View style={styles.summaryRow}>
-              <View style={styles.summaryItem}>
-                <Text style={styles.summaryLabel}>EXERCISE</Text>
-                <Text style={styles.summaryValue}>{selectedExercises.length}</Text>
+          <View style={fs.summaryBox}>
+            <Text style={fs.summaryTitle}>RINGKASAN</Text>
+            <View style={fs.summaryRow}>
+              <View style={fs.summaryItem}>
+                <Text style={fs.summaryLabel}>EXERCISE</Text>
+                <Text style={fs.summaryValue}>{selectedExercises.length}</Text>
               </View>
-              <View style={styles.summaryDivider} />
-              <View style={styles.summaryItem}>
-                <Text style={styles.summaryLabel}>TOTAL SETS</Text>
-                <Text style={styles.summaryValue}>{totalSets}</Text>
+              <View style={fs.summaryDivider} />
+              <View style={fs.summaryItem}>
+                <Text style={fs.summaryLabel}>TOTAL SETS</Text>
+                <Text style={fs.summaryValue}>{totalSets}</Text>
               </View>
             </View>
           </View>
         )}
       </ScrollView>
 
-      <View style={styles.footer}>
-        <TouchableOpacity style={styles.saveButton} onPress={handleSave} activeOpacity={0.85}>
-          <Ionicons name="save-outline" size={18} color="#fff" />
-          <Text style={styles.saveButtonText}>
-            {isEditing ? 'Simpan Perubahan' : 'Simpan Latihan'}
-          </Text>
+      <View style={fs.footer}>
+        <TouchableOpacity style={fs.saveButton} onPress={handlePreview} activeOpacity={0.85}>
+          <Ionicons name="eye-outline" size={18} color="#fff" />
+          <Text style={fs.saveButtonText}>{isEditing ? 'Lihat & Simpan Perubahan' : 'Lihat Preview'}</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
+// ─── Styles Preview ───────────────────────────────────────────────────────────
+const ps = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: '#F2F3F5' },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 14, backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: '#F0F0F0' },
+  headerTitle: { fontSize: 16, fontWeight: '700', color: '#1A1A2E' },
+  scroll: { padding: 16, gap: 14, paddingBottom: 32 },
+  heroCard: { backgroundColor: '#1A1A2E', borderRadius: 20, padding: 20, paddingBottom: 24, gap: 10 },
+  badge: { alignSelf: 'flex-start', backgroundColor: '#4CD964', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5 },
+  badgeText: { fontSize: 11, fontWeight: '800', color: '#1A1A2E', letterSpacing: 1 },
+  heroTitle: { fontSize: 20, fontWeight: '700', color: '#FFFFFF' },
+  statsRow: { flexDirection: 'row', backgroundColor: '#FFFFFF', borderRadius: 16, paddingVertical: 16, paddingHorizontal: 8, alignItems: 'center' },
+  statItem: { flex: 1, alignItems: 'center', gap: 4 },
+  statDivider: { width: 1, height: 36, backgroundColor: '#F0F0F0' },
+  statLabel: { fontSize: 10, fontWeight: '700', color: '#AAA', letterSpacing: 0.6 },
+  statValue: { fontSize: 15, fontWeight: '800', color: '#1A1A2E' },
+  exerciseList: { gap: 10 },
+  exerciseCard: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#FFFFFF', borderRadius: 16, padding: 14 },
+  thumbnail: { width: 52, height: 52, borderRadius: 12, backgroundColor: '#F4F4F4', alignItems: 'center', justifyContent: 'center' },
+  exerciseName: { fontSize: 15, fontWeight: '700', color: '#1A1A2E' },
+  exerciseSets: { fontSize: 13, color: '#888', fontWeight: '500', marginTop: 2 },
+  typeBadge: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#FFF1EC', borderRadius: 20, paddingHorizontal: 8, paddingVertical: 4 },
+  typeBadgeDuration: { backgroundColor: '#EEF4FF' },
+  typeBadgeText: { fontSize: 11, fontWeight: '700', color: '#FF6B35' },
+  quote: { textAlign: 'center', fontSize: 13, color: '#AAA', fontStyle: 'italic', paddingHorizontal: 16, paddingVertical: 8 },
+  footer: { padding: 20, paddingBottom: 32, backgroundColor: '#F2F3F5' },
+  startBtn: { backgroundColor: '#4CD964', borderRadius: 50, paddingVertical: 17, alignItems: 'center', justifyContent: 'center' },
+  startBtnText: { fontSize: 16, fontWeight: '800', color: '#1A1A2E', letterSpacing: 0.3 },
+});
+
+// ─── Styles Form ──────────────────────────────────────────────────────────────
+const fs = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#FFFFFF' },
-  header: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 20, paddingVertical: 14,
-    borderBottomWidth: 1, borderBottomColor: '#F0F0F0',
-  },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#F0F0F0' },
   headerTitle: { fontSize: 16, fontWeight: '700', color: '#1A1A2E', letterSpacing: 1 },
   form: { padding: 16, gap: 16, paddingBottom: 32 },
-
-  // Section Label
-  sectionLabel: {
-    fontSize: 11, fontWeight: '700', color: '#999', letterSpacing: 0.8,
-  },
-
-  // Training Context Radio
+  sectionLabel: { fontSize: 11, fontWeight: '700', color: '#999', letterSpacing: 0.8 },
   contextList: { gap: 8 },
-  contextItem: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    paddingVertical: 14, paddingHorizontal: 16,
-    borderRadius: 12, borderWidth: 1.5, borderColor: '#EEEEEE',
-    backgroundColor: '#FFFFFF',
-  },
-  contextItemActive: {
-    borderColor: '#2E7D32', backgroundColor: '#F0FFF4',
-  },
-  radio: {
-    width: 20, height: 20, borderRadius: 10,
-    borderWidth: 2, borderColor: '#CCCCCC',
-    alignItems: 'center', justifyContent: 'center',
-  },
-  radioDot: {
-    width: 10, height: 10, borderRadius: 5,
-    backgroundColor: '#2E7D32',
-  },
+  contextItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, paddingHorizontal: 16, borderRadius: 12, borderWidth: 1.5, borderColor: '#EEEEEE', backgroundColor: '#FFFFFF' },
+  contextItemActive: { borderColor: '#2E7D32', backgroundColor: '#F0FFF4' },
+  radio: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: '#CCCCCC', alignItems: 'center', justifyContent: 'center' },
+  radioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#2E7D32' },
   contextLabel: { fontSize: 15, fontWeight: '500', color: '#555' },
   contextLabelActive: { fontWeight: '700', color: '#1A1A2E' },
-
-  // Category Description
   catDescBox: { borderLeftWidth: 3, paddingLeft: 12, paddingVertical: 4 },
   catDescText: { fontSize: 13, fontWeight: '600' },
-
-  // Group
   groupBlock: { gap: 0 },
-  groupTitle: {
-    fontSize: 11, fontWeight: '700', color: '#AAA',
-    paddingVertical: 8, paddingHorizontal: 4,
-    textTransform: 'uppercase', letterSpacing: 0.5,
-  },
-
-  // Exercise Row
-  exerciseRow: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingVertical: 14, paddingHorizontal: 14,
-    backgroundColor: '#FFFFFF', borderRadius: 12,
-    borderWidth: 1.5, borderColor: '#F0F0F0', marginBottom: 6,
-  },
+  groupTitle: { fontSize: 11, fontWeight: '700', color: '#AAA', paddingVertical: 8, paddingHorizontal: 4, textTransform: 'uppercase', letterSpacing: 0.5 },
+  exerciseRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14, paddingHorizontal: 14, backgroundColor: '#FFFFFF', borderRadius: 12, borderWidth: 1.5, borderColor: '#F0F0F0', marginBottom: 6 },
   exerciseLeft: { flexDirection: 'row', alignItems: 'center', flex: 1 },
   exerciseName: { fontSize: 14, fontWeight: '500', color: '#555' },
   exerciseRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   setsBadge: { fontSize: 12, fontWeight: '700' },
-
-  // Sets Container — tanpa kolom KG
-  setsContainer: {
-    backgroundColor: '#FAFAFA', borderRadius: 12,
-    padding: 12, marginBottom: 8, marginTop: -4, gap: 8,
-  },
+  setsContainer: { backgroundColor: '#FAFAFA', borderRadius: 12, padding: 12, marginBottom: 8, marginTop: -4, gap: 8 },
   setsHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 2 },
   setsHeaderCell: { fontSize: 10, fontWeight: '700', color: '#AAA', letterSpacing: 0.5 },
   setRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  setNumberBox: {
-    width: 36, height: 36, borderRadius: 8,
-    alignItems: 'center', justifyContent: 'center',
-  },
+  setNumberBox: { width: 36, height: 36, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   setNumber: { fontSize: 14, fontWeight: '800' },
-  setInputBox: {
-    flex: 1, backgroundColor: '#FFFFFF',
-    borderRadius: 8, borderWidth: 1, borderColor: '#E8E8E8',
-  },
-  setInput: {
-    textAlign: 'center', fontSize: 15, fontWeight: '700',
-    color: '#1A1A2E', paddingVertical: 10,
-  },
-  addSetBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    paddingVertical: 10, gap: 4,
-    borderWidth: 1, borderStyle: 'dashed', borderColor: '#DDD',
-    borderRadius: 8,
-  },
+  setInputBox: { flex: 1, backgroundColor: '#FFFFFF', borderRadius: 8, borderWidth: 1, borderColor: '#E8E8E8' },
+  setInput: { textAlign: 'center', fontSize: 15, fontWeight: '700', color: '#1A1A2E', paddingVertical: 10 },
+  setUnitLabel: { fontSize: 12, color: '#AAA', fontWeight: '600', width: 36, textAlign: 'center' },
+  addSetBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 10, gap: 4, borderWidth: 1, borderStyle: 'dashed', borderColor: '#DDD', borderRadius: 8 },
   addSetText: { fontSize: 13, fontWeight: '600' },
-
-  // Error
   errorText: { fontSize: 12, color: '#FF3B30', textAlign: 'center' },
-
-  // Notes
   fieldGroup: { gap: 8 },
   fieldLabel: { fontSize: 11, fontWeight: '700', color: '#999', letterSpacing: 0.8 },
-  textArea: {
-    backgroundColor: '#F4F4F4', borderRadius: 12, padding: 14,
-    fontSize: 14, color: '#1A1A2E', minHeight: 80, textAlignVertical: 'top',
-  },
-
-  // Summary
-  summaryBox: {
-    backgroundColor: '#1A1A2E', borderRadius: 16, padding: 20, gap: 12,
-  },
+  textArea: { backgroundColor: '#F4F4F4', borderRadius: 12, padding: 14, fontSize: 14, color: '#1A1A2E', minHeight: 80, textAlignVertical: 'top' },
+  summaryBox: { backgroundColor: '#1A1A2E', borderRadius: 16, padding: 20, gap: 12 },
   summaryTitle: { fontSize: 11, fontWeight: '700', color: '#FFFFFF99', letterSpacing: 0.8 },
   summaryRow: { flexDirection: 'row', alignItems: 'center' },
   summaryItem: { flex: 1, alignItems: 'center' },
   summaryDivider: { width: 1, height: 40, backgroundColor: '#FFFFFF22' },
   summaryLabel: { fontSize: 11, fontWeight: '600', color: '#FFFFFF88', letterSpacing: 0.5 },
   summaryValue: { fontSize: 28, fontWeight: '800', color: '#FFFFFF', marginTop: 4 },
-
-  // Footer
   footer: { padding: 20, paddingBottom: 28 },
-  saveButton: {
-    backgroundColor: '#1A1A2E', borderRadius: 50, paddingVertical: 16,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-  },
+  saveButton: { backgroundColor: '#1A1A2E', borderRadius: 50, paddingVertical: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   saveButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
 });

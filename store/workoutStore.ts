@@ -1,4 +1,6 @@
 import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { WorkoutFormValues } from '@/components/ui/calendar/workoutformscreen';
 
 export type PhaseResult = {
@@ -41,14 +43,15 @@ export type SavedWorkout = WorkoutFormValues & {
   selectedExercises?: Array<{
     id: string;
     name: string;
-    sets: Array<{ set: number; reps: string; kg: string }>;
+    sets: Array<{ set: number; reps: string; kg?: string }>;
   }>;
 };
 
 type WorkoutStore = {
   workoutsByDate: Record<string, SavedWorkout[]>;
-  selectedDate: Date;
+  selectedDate: string; // ← diubah dari Date ke string agar bisa disimpan
   setSelectedDate: (date: Date) => void;
+  getSelectedDate: () => Date;
   addWorkout: (dateKey: string, data: WorkoutFormValues) => void;
   updateWorkout: (dateKey: string, uid: string, data: WorkoutFormValues) => void;
   deleteWorkout: (dateKey: string, uid: string) => void;
@@ -57,64 +60,85 @@ type WorkoutStore = {
   getWorkoutDates: () => string[];
 };
 
-export const useWorkoutStore = create<WorkoutStore>((set, get) => ({
-  workoutsByDate: {},
-  selectedDate: new Date(),
+export const useWorkoutStore = create<WorkoutStore>()(
+  // ↓ Bungkus dengan persist — inilah satu-satunya perubahan utama
+  persist(
+    (set, get) => ({
+      workoutsByDate: {},
+      selectedDate: new Date().toISOString(), // simpan sebagai string ISO
 
-  setSelectedDate: (date) => set({ selectedDate: date }),
+      // Simpan sebagai string ISO supaya AsyncStorage bisa serialisasi
+      setSelectedDate: (date: Date) =>
+        set({ selectedDate: date.toISOString() }),
 
-  addWorkout: (dateKey, data) => {
-    const newWorkout: SavedWorkout = {
-      ...data,
-      uid: `${Date.now()}-${Math.random()}`,
-      status: 'planned',
-    };
-    set((state) => ({
-      workoutsByDate: {
-        ...state.workoutsByDate,
-        [dateKey]: [...(state.workoutsByDate[dateKey] ?? []), newWorkout],
+      // Kembalikan sebagai objek Date saat dipakai komponen
+      getSelectedDate: () => new Date(get().selectedDate),
+
+      addWorkout: (dateKey, data) => {
+        const newWorkout: SavedWorkout = {
+          ...data,
+          uid: `${Date.now()}-${Math.random()}`,
+          status: 'planned',
+        };
+        set((state) => ({
+          workoutsByDate: {
+            ...state.workoutsByDate,
+            [dateKey]: [...(state.workoutsByDate[dateKey] ?? []), newWorkout],
+          },
+        }));
       },
-    }));
-  },
 
-  updateWorkout: (dateKey, uid, data) => {
-    set((state) => ({
-      workoutsByDate: {
-        ...state.workoutsByDate,
-        [dateKey]: (state.workoutsByDate[dateKey] ?? []).map((w) =>
-          w.uid === uid ? { ...w, ...data, uid, status: w.status } : w
+      updateWorkout: (dateKey, uid, data) => {
+        set((state) => ({
+          workoutsByDate: {
+            ...state.workoutsByDate,
+            [dateKey]: (state.workoutsByDate[dateKey] ?? []).map((w) =>
+              w.uid === uid ? { ...w, ...data, uid, status: w.status } : w
+            ),
+          },
+        }));
+      },
+
+      deleteWorkout: (dateKey, uid) => {
+        set((state) => ({
+          workoutsByDate: {
+            ...state.workoutsByDate,
+            [dateKey]: (state.workoutsByDate[dateKey] ?? []).filter(
+              (w) => w.uid !== uid
+            ),
+          },
+        }));
+      },
+
+      saveTrackingResult: (dateKey, uid, result) => {
+        set((state) => ({
+          workoutsByDate: {
+            ...state.workoutsByDate,
+            [dateKey]: (state.workoutsByDate[dateKey] ?? []).map((w) =>
+              w.uid === uid
+                ? { ...w, trackingResult: result, status: 'completed' }
+                : w
+            ),
+          },
+        }));
+      },
+
+      getWorkoutsByDate: (dateKey) => get().workoutsByDate[dateKey] ?? [],
+
+      getWorkoutDates: () =>
+        Object.keys(get().workoutsByDate).filter(
+          (key) => get().workoutsByDate[key].length > 0
         ),
-      },
-    }));
-  },
+    }),
+    {
+      name: 'pacer-workout-storage', // nama key di AsyncStorage HP
+      storage: createJSONStorage(() => AsyncStorage),
 
-  deleteWorkout: (dateKey, uid) => {
-    set((state) => ({
-      workoutsByDate: {
-        ...state.workoutsByDate,
-        [dateKey]: (state.workoutsByDate[dateKey] ?? []).filter((w) => w.uid !== uid),
-      },
-    }));
-  },
-
-  saveTrackingResult: (dateKey, uid, result) => {
-    set((state) => ({
-      workoutsByDate: {
-        ...state.workoutsByDate,
-        [dateKey]: (state.workoutsByDate[dateKey] ?? []).map((w) =>
-          w.uid === uid ? { ...w, trackingResult: result, status: 'completed' } : w
-        ),
-      },
-    }));
-  },
-
-  getWorkoutsByDate: (dateKey) => get().workoutsByDate[dateKey] ?? [],
-
-  getWorkoutDates: () =>
-    Object.keys(get().workoutsByDate).filter(
-      (key) => get().workoutsByDate[key].length > 0
-    ),
-}));
+      // Hanya simpan workoutsByDate ke storage — selectedDate tidak perlu
+      partialize: (state) => ({ workoutsByDate: state.workoutsByDate }),
+    }
+  )
+);
 
 export const toDateKey = (date: Date): string =>
   date.toISOString().split('T')[0];
