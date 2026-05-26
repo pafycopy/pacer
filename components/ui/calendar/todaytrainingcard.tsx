@@ -48,7 +48,7 @@ type TodayWorkoutCardProps = {
   workoutType?: string;
   workoutName?: string;
   stats?: WorkoutStat[];
-  status?: 'planned' | 'completed';
+  status?: 'planned' | 'completed' | 'missed';
   paceResult?: PaceResult;
   tempoResult?: TempoResult;
   intervalResult?: IntervalResult;
@@ -181,6 +181,7 @@ export default function TodayWorkoutCard({
   };
 
   const isCompleted = status === 'completed';
+  const isMissed = status === 'missed';
   const paceComparison = paceResult ? compareResult(paceResult) : null;
   const PHASE_COLORS = ['#FF9500', '#2E7D32', '#007AFF'];
 
@@ -364,6 +365,11 @@ export default function TodayWorkoutCard({
             <Ionicons name="checkmark-circle" size={18} color="#2E7D32" />
             <Text style={styles.completedBtnText}>Latihan Selesai</Text>
           </View>
+        ) : isMissed ? (
+          <View style={styles.missedBtn}>
+            <Ionicons name="alert-circle" size={18} color="#E65100" />
+            <Text style={styles.missedBtnText}>Jadwal Terlewat</Text>
+          </View>
         ) : (
           <TouchableOpacity style={styles.startButton} onPress={onStartPress} activeOpacity={0.85}>
             <Text style={styles.startButtonIcon}>▶</Text>
@@ -485,6 +491,18 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: '#C8F5C8',
   },
   completedBtnText: { fontSize: 16, fontWeight: '700', color: '#2E7D32' },
+  missedBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#FFF3E0',
+    borderRadius: 14,
+    paddingVertical: 14,
+    borderWidth: 1,
+    borderColor: '#FFB74D',
+  },
+  missedBtnText: { fontSize: 16, fontWeight: '700', color: '#E65100' },
   menuOverlay: { flex: 1 },
   menuBox: {
     position: 'absolute', backgroundColor: '#FFFFFF', borderRadius: 12,

@@ -49,9 +49,9 @@ export type SavedWorkout = WorkoutFormValues & {
 
 type WorkoutStore = {
   workoutsByDate: Record<string, SavedWorkout[]>;
-  selectedDate: string; // ← diubah dari Date ke string agar bisa disimpan
-  setSelectedDate: (date: Date) => void;
-  getSelectedDate: () => Date;
+  selectedDate: Date;
+  setSelectedDate: (date: Date) => void; // Sekarang menerima Date langsung
+  // getSelectedDate: () => Date; // Tidak lagi dibutuhkan
   addWorkout: (dateKey: string, data: WorkoutFormValues) => void;
   updateWorkout: (dateKey: string, uid: string, data: WorkoutFormValues) => void;
   deleteWorkout: (dateKey: string, uid: string) => void;
@@ -65,14 +65,11 @@ export const useWorkoutStore = create<WorkoutStore>()(
   persist(
     (set, get) => ({
       workoutsByDate: {},
-      selectedDate: new Date().toISOString(), // simpan sebagai string ISO
+      selectedDate: new Date(), // Inisialisasi sebagai objek Date
 
-      // Simpan sebagai string ISO supaya AsyncStorage bisa serialisasi
-      setSelectedDate: (date: Date) =>
-        set({ selectedDate: date.toISOString() }),
-
-      // Kembalikan sebagai objek Date saat dipakai komponen
-      getSelectedDate: () => new Date(get().selectedDate),
+      // Sekarang setSelectedDate langsung menyimpan objek Date
+      setSelectedDate: (date: Date) => set({ selectedDate: date }),
+      // getSelectedDate tidak lagi dibutuhkan karena selectedDate selalu Date
 
       addWorkout: (dateKey, data) => {
         const newWorkout: SavedWorkout = {
@@ -133,7 +130,17 @@ export const useWorkoutStore = create<WorkoutStore>()(
     {
       name: 'pacer-workout-storage', // nama key di AsyncStorage HP
       storage: createJSONStorage(() => AsyncStorage),
-
+      // Konversi string ISO kembali ke objek Date saat rehidrasi
+      onRehydrateStorage: (state) => {
+        if (state && typeof state.selectedDate === 'string') {
+          state.selectedDate = new Date(state.selectedDate);
+        }
+        // Pastikan workoutsByDate juga di-handle jika ada Date di dalamnya
+        // (saat ini tidak ada, tapi ini adalah tempat untuk melakukannya)
+        return (rehydratedState, error) => {
+          // Opsional: lakukan sesuatu setelah rehidrasi selesai
+        };
+      },
       // Hanya simpan workoutsByDate ke storage — selectedDate tidak perlu
       partialize: (state) => ({ workoutsByDate: state.workoutsByDate }),
     }

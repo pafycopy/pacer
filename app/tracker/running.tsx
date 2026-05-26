@@ -219,13 +219,18 @@ export default function RunningTracker() {
       <SafeAreaView style={st.safeArea}>
         <ScrollView contentContainerStyle={st.doneScroll} showsVerticalScrollIndicator={false}>
 
-          {/* Trophy icon */}
-          <View style={st.trophyWrap}>
-            <Ionicons name="trophy" size={36} color="#5BFF7A" />
+          {/* Icon lari dengan centang hijau */}
+          <View style={st.finishedIconWrap}>
+            <View style={st.finishedIconCircle}>
+              <Ionicons name="walk" size={44} color="#fff" />
+            </View>
+            <View style={st.finishedCheckBadge}>
+              <Ionicons name="checkmark-circle" size={24} color="#5BFF7A" />
+            </View>
           </View>
 
           {/* Judul */}
-          <Text style={st.doneTitle}>Workout Selesai!</Text>
+          <Text style={st.doneTitle}>Berlari{''}Selesai!</Text>
           <Text style={st.doneSub}>Pelan tidak apa-apa, yang penting konsisten</Text>
 
           {/* Durasi total — card besar */}
@@ -314,8 +319,18 @@ export default function RunningTracker() {
             style={[st.mainBtn, { backgroundColor: status === 'paused' ? '#FFB84D' : '#63EA7B' }]}
             onPress={handleMainButton}
           >
+            {(status === 'running' || status === 'idle') && (
+              <Ionicons
+                name={status === 'idle' ? 'play' : 'pause'}
+                size={18} color="#111"
+                style={{ marginRight: 6 }}
+              />
+            )}
+            {status === 'paused' && (
+              <Ionicons name="play" size={18} color="#111" style={{ marginRight: 6 }} />
+            )}
             <Text style={st.mainBtnText}>
-              {status === 'idle' ? 'START' : status === 'running' ? '⏸ PAUSE' : '▶ RESUME'}
+              {status === 'idle' ? 'START' : status === 'running' ? 'PAUSE' : 'RESUME'}
             </Text>
           </TouchableOpacity>
           {status !== 'idle' && (
@@ -323,7 +338,7 @@ export default function RunningTracker() {
               <Animated.View style={[st.finishBtn, animatedBorderStyle]}>
                 <Animated.View style={[st.finishBtnFill, animatedFillStyle]} />
                 <Animated.Text style={[st.finishText, animatedTextStyle]}>
-                  {isHolding ? '🔴  BERHENTI...' : 'HOLD TO STOP'}
+                  {isHolding ? 'BERHENTI...' : 'HOLD TO STOP'}
                 </Animated.Text>
               </Animated.View>
             </Pressable>
@@ -341,13 +356,16 @@ const st = StyleSheet.create({
   doneScroll: {
     padding: 24, gap: 16, paddingBottom: 48, alignItems: 'center',
   },
+  finishedIconWrap: { position: 'relative', marginBottom: 4 },
+  finishedIconCircle: { width: 100, height: 100, borderRadius: 50, backgroundColor: '#111', alignItems: 'center', justifyContent: 'center' },
+  finishedCheckBadge: { position: 'absolute', bottom: -4, right: -4, backgroundColor: '#fff', borderRadius: 14, padding: 1 },
   trophyWrap: {
     width: 88, height: 88, borderRadius: 44,
     backgroundColor: '#111', alignItems: 'center', justifyContent: 'center',
     marginTop: 12,
   },
   doneTitle: {
-    fontSize: 32, fontWeight: '800', color: '#111',
+    fontSize: 36, fontWeight: '800', color: '#111', lineHeight: 44,
     textAlign: 'center', marginTop: 4,
   },
   doneSub: {
@@ -391,17 +409,21 @@ const st = StyleSheet.create({
   runStatsRow:  { flexDirection: 'row', justifyContent: 'space-between', marginTop: 12, gap: 12 },
   runStatCard:  { flex: 1, backgroundColor: '#F8F8F8', borderRadius: 14, paddingVertical: 18, alignItems: 'center' },
   bottomText:   { textAlign: 'center', color: '#666', marginBottom: 18, fontSize: 13 },
-  mainBtn:      { borderRadius: 999, height: 58, justifyContent: 'center', alignItems: 'center' },
-  mainBtnText:  { color: '#111', fontSize: 15, fontWeight: '800', letterSpacing: 1 },
+  mainBtn: {
+    borderRadius: 999, height: 58,
+    justifyContent: 'center', alignItems: 'center',
+    flexDirection: 'row',
+  },
+  mainBtnText: { color: '#111', fontSize: 15, fontWeight: '800', letterSpacing: 1 },
   finishBtn: {
-    marginTop: 12, height: 58, borderRadius: 999,
-    borderWidth: 2, borderColor: 'rgba(239,68,68,0.3)',
-    backgroundColor: '#FFFFFF',
+    marginTop: 10, height: 58, borderRadius: 999,
+    borderWidth: 0,
+    backgroundColor: '#E8E8E8',
     justifyContent: 'center', alignItems: 'center', overflow: 'hidden',
   },
   finishBtnFill: {
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
     backgroundColor: '#EF4444', borderRadius: 999,
   },
-  finishText: { color: '#EF4444', fontWeight: '700', letterSpacing: 1, fontSize: 14 },
+  finishText: { color: '#555', fontWeight: '700', letterSpacing: 1.5, fontSize: 14 },
 });

@@ -125,6 +125,10 @@ const training = () => {
     : null;
 
   const isToday = selectedDate.toDateString() === new Date().toDateString();
+  // Tanggal sudah lewat (bukan hari ini dan sebelum hari ini)
+  const todayMidnight = new Date(); todayMidnight.setHours(0,0,0,0);
+  const selMidnight = new Date(selectedDate); selMidnight.setHours(0,0,0,0);
+  const isPastDate = selMidnight < todayMidnight;
   const sectionTitle = isToday
     ? 'Today'
     : selectedDate.toLocaleDateString('id-ID', {
@@ -133,7 +137,7 @@ const training = () => {
 
   return (
     <View style={styles.container}>
-      <Header title="Calendar" image="https://i.pravatar.cc/100" />
+      <Header title="Calendar"/>
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -153,7 +157,13 @@ const training = () => {
                 workoutType={workout.workoutType}
                 workoutName={workout.workoutName}
                 stats={resolveStats(workout)}
-                status={workout.status}
+                status={
+                  workout.status === 'completed'
+                    ? 'completed'
+                    : isPastDate
+                    ? 'missed'
+                    : 'planned'
+                }
 
                 paceResult={
                   workout.trackingResult &&

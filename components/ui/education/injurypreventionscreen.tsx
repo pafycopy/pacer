@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   Animated,
   Modal,
-  ScrollView,
 } from 'react-native';
 
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -19,7 +18,7 @@ import {
   EducationLesson,
 } from '@/constants/educationdata';
 
-import EducationLessonDetail from './educationlessondetail';
+import InjuryDetailScreen from './injurydetailscreen';
 
 type Props = {
   topic: EducationTopic;
@@ -61,18 +60,6 @@ const InjuryPreventionScreen = ({
           />
         </TouchableOpacity>
 
-        <Animated.Text
-          numberOfLines={1}
-          style={[
-            styles.headerTitle,
-            { opacity: headerTitleOpacity },
-          ]}
-        >
-          {topic.title}
-        </Animated.Text>
-
-        <View style={{ width: 36 }} />
-
       </View>
 
       {/* CONTENT */}
@@ -96,29 +83,23 @@ const InjuryPreventionScreen = ({
         )}
       >
 
+        {/* TOP LABEL */}
+        <View style={styles.topLabel}>
+
+          <Ionicons
+            name="walk-outline"
+            size={11}
+            color="#111"
+          />
+
+          <Text style={styles.topLabelText}>
+            Panduan Pencegahan Cedera
+          </Text>
+
+        </View>
+
         {/* HERO */}
         <View style={styles.heroSection}>
-
-          <View
-            style={[
-              styles.heroBadge,
-              {
-                backgroundColor: topic.color,
-              },
-            ]}
-          >
-
-            <Ionicons
-              name={topic.icon as any}
-              size={16}
-              color="#111"
-            />
-
-            <Text style={styles.heroBadgeText}>
-              Injury Prevention
-            </Text>
-
-          </View>
 
           <Text style={styles.heroTitle}>
             {topic.title}
@@ -130,82 +111,112 @@ const InjuryPreventionScreen = ({
 
         </View>
 
-        <View style={styles.divider} />
-
-        {/* LESSONS */}
-        {topic.lessons.map((lesson) => (
+        {/* LESSON LIST */}
+        {topic.lessons.map((lesson, index) => (
 
           <TouchableOpacity
             key={lesson.id}
+            activeOpacity={0.85}
             style={styles.lessonCard}
-            activeOpacity={0.8}
             onPress={() =>
               setSelectedLesson(lesson)
             }
           >
 
-            <View style={styles.lessonTop}>
-
-              <View
-                style={[
-                  styles.iconBox,
-                  {
-                    backgroundColor: topic.color,
-                  },
-                ]}
-              >
-                <Ionicons
-                  name="medkit"
-                  size={18}
-                  color="#111"
-                />
-              </View>
-
-              <View style={styles.lessonText}>
-
-                <Text style={styles.lessonTitle}>
-                  {lesson.title}
-                </Text>
-
-                {lesson.subtitle ? (
-                  <Text style={styles.lessonSubtitle}>
-                    {lesson.subtitle}
-                  </Text>
-                ) : null}
-
-              </View>
-
-              <Ionicons
-                name="chevron-forward"
-                size={18}
-                color="#999"
-              />
-
+            {/* NUMBER */}
+            <View style={styles.numberBadge}>
+              <Text style={styles.numberText}>
+                {index + 1}
+              </Text>
             </View>
 
-            <Text style={styles.lessonDescription}>
-              {lesson.description}
+            {/* TITLE */}
+            <Text style={styles.lessonTitle}>
+              {lesson.title}
             </Text>
+
+            {/* SUBTITLE */}
+            {lesson.subtitle ? (
+              <Text style={styles.lessonSubtitle}>
+                ({lesson.subtitle})
+              </Text>
+            ) : null}
+
+            {/* KARAKTERISTIK */}
+            {lesson.detail?.karakteristik?.[0] && (
+              <View style={styles.infoRow}>
+
+                <Ionicons
+                  name="search-outline"
+                  size={13}
+                  color="#16A34A"
+                  style={styles.infoIcon}
+                />
+
+                <View style={{ flex: 1 }}>
+
+                  <Text
+                    style={[
+                      styles.infoLabel,
+                      {
+                        color: '#16A34A',
+                      },
+                    ]}
+                  >
+                    KARAKTERISTIK
+                  </Text>
+
+                  <Text style={styles.infoText}>
+                    {
+                      lesson.detail
+                        .karakteristik[0]
+                    }
+                  </Text>
+
+                </View>
+
+              </View>
+            )}
+
+            {/* PEMICU */}
+            {lesson.detail?.pemicu?.[0] && (
+              <View style={styles.infoRow}>
+
+                <Ionicons
+                  name="flash-outline"
+                  size={13}
+                  color="#F97316"
+                  style={styles.infoIcon}
+                />
+
+                <View style={{ flex: 1 }}>
+
+                  <Text
+                    style={[
+                      styles.infoLabel,
+                      {
+                        color: '#F97316',
+                      },
+                    ]}
+                  >
+                    PEMICU
+                  </Text>
+
+                  <Text style={styles.infoText}>
+                    {
+                      lesson.detail
+                        .pemicu[0]
+                    }
+                  </Text>
+
+                </View>
+
+              </View>
+            )}
 
           </TouchableOpacity>
 
         ))}
-
-        {/* FOOTER */}
-        <View style={styles.footer}>
-
-          <Ionicons
-            name="shield-checkmark"
-            size={18}
-            color="#34C759"
-          />
-
-          <Text style={styles.footerText}>
-            Pencegahan cedera lebih baik
-            daripada pemulihan cedera.
-          </Text>
-
-        </View>
 
       </Animated.ScrollView>
 
@@ -220,7 +231,7 @@ const InjuryPreventionScreen = ({
       >
 
         {selectedLesson && (
-          <EducationLessonDetail
+          <InjuryDetailScreen
             lesson={selectedLesson}
             topic={topic}
             onBack={() =>
@@ -241,7 +252,7 @@ const styles = StyleSheet.create({
 
   safeArea: {
     flex: 1,
-    backgroundColor: '#FAFAFA',
+    backgroundColor: '#F7F7F7',
   },
 
   header: {
@@ -249,13 +260,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
 
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     paddingVertical: 12,
 
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
-
-    backgroundColor: '#FAFAFA',
+    backgroundColor: '#F7F7F7',
   },
 
   backBtn: {
@@ -263,7 +271,16 @@ const styles = StyleSheet.create({
     height: 36,
     borderRadius: 18,
 
-    backgroundColor: '#F0F0F0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  profileBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+
+    backgroundColor: '#1F2937',
 
     alignItems: 'center',
     justifyContent: 'center',
@@ -274,7 +291,7 @@ const styles = StyleSheet.create({
 
     textAlign: 'center',
 
-    marginHorizontal: 8,
+    marginHorizontal: 10,
 
     fontSize: 15,
     fontWeight: '700',
@@ -282,123 +299,123 @@ const styles = StyleSheet.create({
   },
 
   content: {
-    padding: 20,
+    paddingHorizontal: 20,
     paddingBottom: 40,
   },
 
+ topLabel: {
+  flexDirection: 'row',
+  alignItems: 'center',
+
+  alignSelf: 'flex-start',
+
+  backgroundColor: '#EFEFEF',
+
+  borderRadius: 999,
+
+  paddingHorizontal: 16,
+  paddingVertical: 6,
+
+  gap: 8,
+
+},
+  topLabelText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#444',
+  },
+
   heroSection: {
-    gap: 12,
     marginBottom: 24,
-  },
-
-  heroBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-
-    alignSelf: 'flex-start',
-
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-
-    borderRadius: 20,
-  },
-
-  heroBadgeText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#111',
   },
 
   heroTitle: {
-    fontSize: 28,
+    fontSize: 38,
     fontWeight: '800',
     color: '#111',
+
+    lineHeight: 42,
+
+    marginBottom: 16,
   },
 
   heroDescription: {
-    fontSize: 14,
-    lineHeight: 22,
-    color: '#666',
-  },
-
-  divider: {
-    height: 1,
-    backgroundColor: '#EEEEEE',
-    marginBottom: 24,
+    fontSize: 16,
+    lineHeight: 28,
+    color: '#5F5F5F',
   },
 
   lessonCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#EFEFEF',
 
-    borderRadius: 18,
+    borderRadius: 20,
 
     padding: 18,
 
-    marginBottom: 14,
-
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-
-    elevation: 1,
+    marginBottom: 18,
   },
 
-  lessonTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-
-    marginBottom: 12,
-  },
-
-  iconBox: {
-    width: 42,
-    height: 42,
+  numberBadge: {
+    width: 28,
+    height: 28,
     borderRadius: 14,
+
+    backgroundColor: '#111827',
 
     alignItems: 'center',
     justifyContent: 'center',
 
-    marginRight: 12,
+    marginBottom: 14,
   },
 
-  lessonText: {
-    flex: 1,
+  numberText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#6BFF8F',
   },
 
   lessonTitle: {
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: 21,
+    fontWeight: '800',
     color: '#111',
+
+    marginBottom: 4,
   },
 
   lessonSubtitle: {
-    marginTop: 2,
-
     fontSize: 12,
-    color: '#888',
-  },
-
-  lessonDescription: {
-    fontSize: 13,
-    lineHeight: 21,
     color: '#666',
+
+    marginBottom: 18,
   },
 
-  footer: {
+  infoRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+    alignItems: 'flex-start',
 
-    marginTop: 12,
+    marginBottom: 14,
   },
 
-  footerText: {
-    flex: 1,
+  infoIcon: {
+    marginRight: 8,
+    marginTop: 2,
+  },
 
-    fontSize: 13,
-    color: '#555',
-    lineHeight: 20,
+  infoLabel: {
+    fontSize: 11,
+    fontWeight: '800',
+
+    letterSpacing: 0.5,
+
+    marginBottom: 4,
+  },
+
+  infoText: {
+    fontSize: 14,
+    lineHeight: 23,
+    color: '#333',
+
+    fontWeight: '500',
   },
 
 });

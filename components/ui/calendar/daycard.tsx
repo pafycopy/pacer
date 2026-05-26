@@ -6,17 +6,27 @@ type Props = {
   date: number;
   active?: boolean;
   hasWorkout?: boolean;
+  isMissed?: boolean; // workout ada tapi tanggal sudah lewat & belum selesai
   onPress?: () => void;
 };
 
-const DayCard = ({ day, date, active, hasWorkout = false, onPress }: Props) => {
+const DayCard = ({ day, date, active, hasWorkout = false, isMissed = false, onPress }: Props) => {
+  // Tentukan warna dot:
+  // - oranye  : ada workout tapi terlewat
+  // - hijau   : ada workout, belum terlewat
+  // - transparan : tidak ada workout
+  const dotColor = !hasWorkout
+    ? 'transparent'
+    : isMissed
+    ? '#FF9800'
+    : '#4CD964';
+
   return (
     <TouchableOpacity onPress={onPress}>
       <View style={[styles.card, active && styles.active]}>
         <Text style={[styles.day, active && styles.activeText]}>{day}</Text>
         <Text style={[styles.date, active && styles.activeText]}>{date}</Text>
-        {/* Dot hijau kalau ada workout, transparan kalau tidak */}
-        <View style={[styles.dot, { backgroundColor: hasWorkout ? '#4CD964' : 'transparent' }]} />
+        <View style={[styles.dot, { backgroundColor: dotColor }]} />
       </View>
     </TouchableOpacity>
   );

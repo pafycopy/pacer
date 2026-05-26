@@ -1,22 +1,28 @@
-import { View, Text, Image, StyleSheet } from "react-native";
+import { View, Text, Image, StyleSheet, TouchableOpacity } from "react-native";
+import { router } from "expo-router";
 import { Colors } from "@/constants/theme";
+import { useUserStore } from "@/store/userStore";
 
 type HeaderProps = {
   title: string;
-  image?: string;
 };
 
-const Header = ({ title, image }: HeaderProps) => {
+const Header = ({ title }: HeaderProps) => {
+  const { avatarUri } = useUserStore();
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>{title}</Text>
 
-      <Image
-        source={{
-          uri: image || "https://i.pravatar.cc/100",
-        }}
-        style={styles.avatar}
-      />
+      <TouchableOpacity
+        onPress={() => router.push("/editprofile" as any)}
+        activeOpacity={0.8}
+      >
+        <Image
+          source={{ uri: avatarUri ?? "https://i.pravatar.cc/100" }}
+          style={styles.avatar}
+        />
+      </TouchableOpacity>
     </View>
   );
 };
@@ -31,23 +37,22 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 3,
     elevation: 3,
   },
-
   title: {
     fontSize: 18,
     fontWeight: "600",
     color: "#333",
   },
-
   avatar: {
     width: 36,
     height: 36,
     borderRadius: 18,
+    borderWidth: 1.5,
+    borderColor: "#E8F5E9",
   },
 });

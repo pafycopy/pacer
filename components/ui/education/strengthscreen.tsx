@@ -33,6 +33,8 @@ const StrengthScreen = ({ topic, onBack }: Props) => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
+
+      {/* HEADER */}
       <View style={styles.header}>
         <TouchableOpacity onPress={onBack} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={22} color="#111" />
@@ -52,19 +54,23 @@ const StrengthScreen = ({ topic, onBack }: Props) => {
           { useNativeDriver: true }
         )}
       >
-        <View style={styles.heroSection}>
-          <View style={[styles.heroBadge, { backgroundColor: topic.color }]}>
-            <Ionicons name={topic.icon as any} size={16} color="#111" />
-            <Text style={styles.heroBadgeText}>Seri Kursus</Text>
+
+        {/* HERO CARD — dark background */}
+        <View style={styles.heroCard}>
+          {/* Badge */}
+          <View style={styles.heroBadge}>
+            <Text style={styles.heroBadgeText}>SERI KURSUS</Text>
           </View>
+
+          {/* Judul & Deskripsi */}
           <Text style={styles.heroTitle}>{topic.title}</Text>
           <Text style={styles.heroDescription}>{topic.heroDescription}</Text>
         </View>
 
-        <View style={styles.divider} />
-
+        {/* MODUL LABEL */}
         <Text style={styles.modulLabel}>Modul</Text>
 
+        {/* EXERCISE CARDS */}
         {topic.lessons.map((lesson) => (
           <ExerciseCard
             key={lesson.id}
@@ -77,6 +83,7 @@ const StrengthScreen = ({ topic, onBack }: Props) => {
             onPress={() => setSelectedLesson(lesson)}
           />
         ))}
+
       </Animated.ScrollView>
 
       <Modal
@@ -94,6 +101,7 @@ const StrengthScreen = ({ topic, onBack }: Props) => {
           />
         )}
       </Modal>
+
     </SafeAreaView>
   );
 };
@@ -101,29 +109,51 @@ const StrengthScreen = ({ topic, onBack }: Props) => {
 export default StrengthScreen;
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#FAFAFA' },
+  safeArea: { flex: 1, backgroundColor: '#F5F5F5' },
+
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 16, paddingVertical: 12,
-    borderBottomWidth: 1, borderBottomColor: '#F0F0F0', backgroundColor: '#FAFAFA',
+    borderBottomWidth: 1, borderBottomColor: '#F0F0F0', backgroundColor: '#F5F5F5',
   },
   backBtn: {
     width: 36, height: 36, borderRadius: 18,
-    backgroundColor: '#F0F0F0', alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#EBEBEB', alignItems: 'center', justifyContent: 'center',
   },
   headerTitle: {
     flex: 1, textAlign: 'center', marginHorizontal: 8,
     fontSize: 15, fontWeight: '700', color: '#111',
   },
-  content: { padding: 20, paddingBottom: 40 },
-  heroSection: { gap: 12, marginBottom: 24 },
-  heroBadge: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20,
+
+  content: { padding: 16, paddingBottom: 40, gap: 16 },
+
+  // ── Hero Card ──────────────────────────────────────────────────────────────
+  heroCard: {
+    backgroundColor: '#fff',
+    borderRadius: 24,
+    padding: 24,
+    paddingBottom: 28,
+    gap: 12,
   },
-  heroBadgeText: { fontSize: 12, fontWeight: '700', color: '#111' },
-  heroTitle: { fontSize: 28, fontWeight: '800', color: '#111' },
-  heroDescription: { fontSize: 14, lineHeight: 22, color: '#666' },
-  divider: { height: 1, backgroundColor: '#EEEEEE', marginBottom: 16 },
-  modulLabel: { fontSize: 18, fontWeight: '800', color: '#111', marginBottom: 16 },
+  heroBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#6BFF8F',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+  },
+  heroBadgeText: {
+    fontSize: 11, fontWeight: '800', color: '#006E2F', letterSpacing: 1,
+  },
+  heroTitle: {
+    fontSize: 28, fontWeight: '900', color: '#111', lineHeight: 36,
+  },
+  heroDescription: {
+    fontSize: 14, lineHeight: 22, color: '#111',
+  },
+
+  // ── Modul label ────────────────────────────────────────────────────────────
+  modulLabel: {
+    fontSize: 18, fontWeight: '800', color: '#111',
+  },
 });

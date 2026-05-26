@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "pacer",
-    "slug": "expo-template-default",
+    "slug": "Brecise",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -39,7 +39,14 @@
           }
         }
       ],
-      "expo-audio"
+      "expo-audio",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Izinkan Pacer mengakses galeri untuk foto profil.",
+          "cameraPermission": "Izinkan Pacer menggunakan kamera untuk foto profil."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

@@ -72,6 +72,34 @@ export default function StrengthTracker() {
   const currentExercise = progress[currentExerciseIndex];
   const currentSet = currentExercise?.sets[currentSetIndex];
 
+  // ── Auto-start duration timer setelah rest ─────────────────────────────
+  // Saat isTraining=true tapi setTimerActive=false (baru masuk exercise screen),
+  // dan exercise bertipe duration → langsung jalankan timer
+  useEffect(() => {
+    if (
+      screen === 'exercise' &&
+      isTraining &&
+      !setTimerActive &&
+      currentExercise?.inputType === 'duration'
+    ) {
+      const secs = parseInt(currentSet?.duration ?? '30');
+      setSetCountdown(secs);
+      setSetTimerActive(true);
+      setTimerRef.current = setInterval(() => {
+        setSetCountdown((prev) => {
+          if (prev <= 1) {
+            clearInterval(setTimerRef.current);
+            setTimerRef.current = null;
+            setSetTimerActive(false);
+            completeSetAuto();
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+  }, [screen, isTraining]);
+
   // ── Total timer ──────────────────────────────────────────────────────────
   useEffect(() => {
     if (screen === 'exercise' || screen === 'rest') {
@@ -215,7 +243,8 @@ export default function StrengthTracker() {
     const isLastSet = setIdx === exercise.sets.length - 1;
     if (!isLastSet) { setCurrentSetIndex(setIdx + 1); }
     else { setCurrentExerciseIndex(exIdx + 1); setCurrentSetIndex(0); }
-    setIsTraining(false);
+    // Auto-start: langsung mulai set tanpa perlu pencet tombol
+    setIsTraining(true);
     setScreen('exercise');
   };
 
@@ -223,7 +252,8 @@ export default function StrengthTracker() {
     const isLastSet = currentSetIndex === currentExercise.sets.length - 1;
     if (!isLastSet) { setCurrentSetIndex((p) => p + 1); }
     else { setCurrentExerciseIndex((p) => p + 1); setCurrentSetIndex(0); }
-    setIsTraining(false);
+    // Auto-start: langsung mulai set tanpa perlu pencet tombol
+    setIsTraining(true);
     setScreen('exercise');
   };
 
@@ -314,57 +344,71 @@ export default function StrengthTracker() {
     return (
       <SafeAreaView style={s.safe}>
         <View style={s.exScreen}>
-          {/* Progress bar + timer */}
-          <View style={s.exTopBar}>
-            <View style={s.progressBarWrap}>
-              <View style={[s.progressBarFill, { width: `${(doneSets / totalSets) * 100}%` as any }]} />
-            </View>
-            <Text style={s.timerText}>{formatTime(totalTime)}</Text>
+          {/* Progress bar */}
+          <View style={s.progressBarWrap}>
+            <View style={[s.progressBarFill, { width: `${(doneSets / totalSets) * 100}%` as any }]} />
           </View>
 
+          {/* Label + Nama Exercise */}
+          <Text style={s.exCurrentLabel}>CURRENT EXERCISE</Text>
           <Text style={s.exTitle}>{currentExercise.name}</Text>
 
+          {/* Video / placeholder */}
           <View style={s.videoPlaceholder}>
             <Ionicons name="barbell-outline" size={48} color="#555" />
           </View>
 
-          {/* Stat cards */}
+          {/* Stat cards — sesuai referensi */}
           <View style={s.exStatsRow}>
             <View style={s.exStatCard}>
-              <Text style={s.exStatLabel}>SET</Text>
-              <Text style={s.exStatValue}>
-                {currentSetIndex + 1}
-                <Text style={s.exStatTotal}>/{currentExercise.sets.length}</Text>
-              </Text>
+              <Text style={s.exStatLabel}>CURRENT PROGRESS</Text>
+              <View style={s.exSetRow}>
+                <Text style={s.exSetWord}>Set </Text>
+                <Text style={s.exSetNum}>{currentSetIndex + 1}</Text>
+                <Text style={s.exSetSlash}> / </Text>
+                <Text style={s.exSetTotal}>{currentExercise.sets.length}</Text>
+              </View>
             </View>
             <View style={s.exStatCard}>
-              {/* Label berubah sesuai tipe */}
               <Text style={s.exStatLabel}>{isDuration ? 'DURASI' : 'TARGET REPS'}</Text>
               {isDuration ? (
-                // Tampilkan countdown aktif saat latihan, target saat belum mulai
-                <Text style={[s.exStatValue, setTimerActive && { color: '#FF6B35' }]}>
-                  {setTimerActive ? setCountdown : targetValue}
-                  <Text style={s.exStatTotal}> dtk</Text>
-                </Text>
+                <View style={s.exSetRow}>
+                  <Text style={[s.exSetNum, setTimerActive && { color: '#FF6B35' }]}>
+                    {setTimerActive ? setCountdown : targetValue}
+                  </Text>
+                  <Text style={s.exSetWord}>{''}Detik</Text>
+                </View>
               ) : (
-                <Text style={s.exStatValue}>{currentSet.reps}</Text>
+                <View style={s.exSetRow}>
+                  <Text style={s.exSetNum}>{currentSet.reps}</Text>
+                  <Text style={s.exSetWord}>{''}Reps</Text>
+                </View>
               )}
             </View>
           </View>
 
-          {/* CTA button */}
-          <TouchableOpacity
-            style={[s.ctaBtn, isTraining && { backgroundColor: '#FFD84D' }]}
-            onPress={isTraining ? completeSet : startSet}
-            activeOpacity={0.88}
-          >
-            <Ionicons name={isTraining ? 'checkmark' : (isDuration ? 'timer-outline' : 'play')} size={20} color="#111" />
-            <Text style={s.ctaBtnText}>
-              {isTraining
-                ? (isDuration ? `SELESAI (${setCountdown} dtk)` : 'COMPLETE SET')
-                : (isDuration ? 'MULAI TIMER' : 'START SET')}
-            </Text>
-          </TouchableOpacity>
+          {/* Tombol bawah: START SET (atas) + SKIP SET (bawah) */}
+          <View style={s.exBtnGroup}>
+            <TouchableOpacity
+              style={[s.ctaBtn, isTraining && s.ctaBtnActive]}
+              onPress={isTraining ? completeSet : startSet}
+              activeOpacity={0.88}
+            >
+              <Ionicons
+                name={isTraining ? 'checkmark' : (isDuration ? 'timer-outline' : 'play')}
+                size={20} color="#111"
+              />
+              <Text style={s.ctaBtnText}>
+                {isTraining
+                  ? (isDuration ? `SELESAI (${setCountdown} dtk)` : 'COMPLETE SET')
+                  : (isDuration ? 'MULAI TIMER' : 'START SET')}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={s.exSecondaryBtn} onPress={completeSet} activeOpacity={0.8}>
+              <Text style={s.exSecondaryText}>SKIP SET</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </SafeAreaView>
     );
@@ -414,8 +458,16 @@ export default function StrengthTracker() {
   return (
     <SafeAreaView style={s.safe}>
       <View style={s.finishedScreen}>
-        <View style={s.trophyWrap}><Ionicons name="trophy" size={36} color="#5BFF7A" /></View>
-        <Text style={s.finishedTitle}>Workout Selesai!</Text>
+        {/* Icon dengan centang hijau — sesuai referensi */}
+        <View style={s.finishedIconWrap}>
+          <View style={s.finishedIconCircle}>
+            <Ionicons name="barbell" size={40} color="#6BFF8F" />
+          </View>
+          <View style={s.finishedCheckBadge}>
+            <Ionicons name="checkmark-circle" size={24} color="#6BFF8F"/>
+          </View>
+        </View>
+        <Text style={s.finishedTitle}>Workout{''}Selesai!</Text>
         <Text style={s.finishedSub}>Pelan tidak apa-apa, yang penting konsisten</Text>
         <View style={s.durationCard}>
           <Text style={s.durationLabel}>DURASI TOTAL</Text>
@@ -458,20 +510,26 @@ const s = StyleSheet.create({
   startBtn: { backgroundColor: '#5BFF7A', borderRadius: 50, paddingVertical: 18, alignItems: 'center' },
   startBtnText: { fontSize: 16, fontWeight: '800', color: '#111' },
   // Exercise
-  exScreen: { flex: 1, padding: 20, gap: 16 },
-  exTopBar: { gap: 6 },
+  exScreen: { flex: 1, padding: 20, gap: 14 },
   progressBarWrap: { height: 5, backgroundColor: '#E0E0E0', borderRadius: 3, overflow: 'hidden' },
   progressBarFill: { height: '100%', backgroundColor: '#5BFF7A', borderRadius: 3 },
-  timerText: { fontSize: 13, fontWeight: '700', color: '#888', textAlign: 'right' },
-  exTitle: { fontSize: 30, fontWeight: '800', color: '#111' },
-  videoPlaceholder: { height: 240, backgroundColor: '#333', borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  exCurrentLabel: { fontSize: 11, fontWeight: '700', color: '#999', letterSpacing: 0.8 },
+  exTitle: { fontSize: 28, fontWeight: '800', color: '#111', marginTop: -4 },
+  videoPlaceholder: { flex: 1, minHeight: 180, backgroundColor: '#333', borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   exStatsRow: { flexDirection: 'row', gap: 12 },
-  exStatCard: { flex: 1, backgroundColor: '#FFF', borderRadius: 18, padding: 16 },
-  exStatLabel: { fontSize: 11, fontWeight: '700', color: '#888' },
-  exStatValue: { fontSize: 36, fontWeight: '800', color: '#111', marginTop: 8 },
-  exStatTotal: { fontSize: 20, fontWeight: '600', color: '#AAA' },
-  ctaBtn: { backgroundColor: '#5BFF7A', borderRadius: 40, paddingVertical: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
-  ctaBtnText: { fontSize: 16, fontWeight: '800', color: '#111' },
+  exStatCard: { flex: 1, backgroundColor: '#FFF', borderRadius: 18, padding: 16, gap: 6 },
+  exStatLabel: { fontSize: 10, fontWeight: '700', color: '#888', letterSpacing: 0.5 },
+  exSetRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 2 },
+  exSetWord: { fontSize: 20, fontWeight: '700', color: '#111', paddingBottom: 2 },
+  exSetNum: { fontSize: 38, fontWeight: '800', color: '#111', lineHeight: 44 },
+  exSetSlash: { fontSize: 22, fontWeight: '600', color: '#AAA', paddingBottom: 2 },
+  exSetTotal: { fontSize: 22, fontWeight: '600', color: '#AAA', paddingBottom: 2 },
+  ctaBtn: { backgroundColor: '#5BFF7A', borderRadius: 50, paddingVertical: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
+  ctaBtnActive: { backgroundColor: '#FFD84D' },
+  ctaBtnText: { fontSize: 15, fontWeight: '800', color: '#111', letterSpacing: 0.5 },
+  exBtnGroup: { gap: 10, marginTop: 'auto' as any },
+  exSecondaryBtn: { backgroundColor: '#F0F0F0', borderRadius: 50, paddingVertical: 16, alignItems: 'center', borderWidth: 1, borderColor: '#E0E0E0' },
+  exSecondaryText: { fontSize: 13, fontWeight: '700', color: '#555', letterSpacing: 0.5 },
   // Rest
   restScroll: { flexGrow: 1, padding: 20, gap: 20, alignItems: 'center', paddingBottom: 40 },
   restTopRow: { alignItems: 'center', gap: 2 },
@@ -492,8 +550,11 @@ const s = StyleSheet.create({
   addTimeBtnText: { fontWeight: '800', color: '#111', fontSize: 14 },
   // Finished
   finishedScreen: { flex: 1, padding: 24, justifyContent: 'center', alignItems: 'center', gap: 4 },
+  finishedIconWrap: { position: 'relative', marginBottom: 4 },
+  finishedIconCircle: { width: 100, height: 100, borderRadius: 50, backgroundColor: '#111', alignItems: 'center', justifyContent: 'center' },
+  finishedCheckBadge: { position: 'absolute', bottom: -4, right: -4, backgroundColor: '#111', borderRadius: 14, padding: 1 },
   trophyWrap: { width: 88, height: 88, borderRadius: 44, backgroundColor: '#111', alignItems: 'center', justifyContent: 'center' },
-  finishedTitle: { fontSize: 32, fontWeight: '800', color: '#111', marginTop: 16, textAlign: 'center' },
+  finishedTitle: { fontSize: 36, fontWeight: '800', color: '#111', marginTop: 20, textAlign: 'center', lineHeight: 44 },
   finishedSub: { fontSize: 14, color: '#777', textAlign: 'center', lineHeight: 22 },
   durationCard: { width: '100%', backgroundColor: '#FFF', borderRadius: 22, padding: 20, marginTop: 20, gap: 6 },
   durationLabel: { fontSize: 11, fontWeight: '700', color: '#888' },

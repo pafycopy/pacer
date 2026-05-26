@@ -6,7 +6,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useWorkoutStore, toDateKey } from "@/store/workoutStore";
 
 const WeekCalendar = () => {
-  const { setSelectedDate, getWorkoutDates } = useWorkoutStore();
+  const { setSelectedDate, getWorkoutDates, workoutsByDate } = useWorkoutStore();
   const workoutDates = getWorkoutDates();
 
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -40,7 +40,24 @@ const WeekCalendar = () => {
 
   const handleSelectDate = (date: Date) => {
     setActiveDate(date);
-    setSelectedDate(date); // update store
+    setSelectedDate(date);
+  };
+
+  // Cek apakah tanggal tertentu "missed":
+  // ada workout planned tapi tanggalnya sudah lewat (sebelum hari ini) & belum completed
+  const isMissedDate = (fullDate: Date): boolean => {
+    const todayMidnight = new Date();
+    todayMidnight.setHours(0, 0, 0, 0);
+
+    const dateMidnight = new Date(fullDate);
+    dateMidnight.setHours(0, 0, 0, 0);
+
+    if (dateMidnight >= todayMidnight) return false; // hari ini / masa depan → tidak missed
+
+    const key = toDateKey(fullDate);
+    const workouts = workoutsByDate[key] ?? [];
+    // Missed jika ada workout tapi tidak ada yang completed
+    return workouts.length > 0 && !workouts.some((w) => w.status === 'completed');
   };
 
   return (
@@ -63,6 +80,7 @@ const WeekCalendar = () => {
             key={index}
             {...item}
             hasWorkout={workoutDates.includes(toDateKey(item.fullDate))}
+            isMissed={isMissedDate(item.fullDate)}
             onPress={() => handleSelectDate(item.fullDate)}
           />
         ))}

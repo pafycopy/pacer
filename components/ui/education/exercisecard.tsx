@@ -7,10 +7,11 @@ type Props = {
   subtitle?: string;
   description?: string;
   duration?: string;
-  exercise?: string;   // jumlah exercise, misal "16 Exercises"
+  exercise?: string;
+  thumbnail?: string;  // ← tambah agar tidak error
   icon?: string;
   iconColor?: string;
-  onPress?: () => void; // ← dipindah ke footer agar tap area jelas
+  onPress?: () => void;
 };
 
 export default function ExerciseCard({
