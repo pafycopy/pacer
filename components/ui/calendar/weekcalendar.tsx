@@ -3,7 +3,8 @@ import { useState } from "react";
 import DayCard from "@/components/ui/calendar/daycard";
 import { generateDays } from "@/utils/date";
 import { Ionicons } from "@expo/vector-icons";
-import { useWorkoutStore, toDateKey } from "@/store/workoutStore";
+// ✅ FIX: ganti import ke supabaseWorkoutStore
+import { useWorkoutStore, toDateKey } from "@/store/supabaseWorkoutStore";
 
 const WeekCalendar = () => {
   const { setSelectedDate, getWorkoutDates, workoutsByDate } = useWorkoutStore();
@@ -43,8 +44,6 @@ const WeekCalendar = () => {
     setSelectedDate(date);
   };
 
-  // Cek apakah tanggal tertentu "missed":
-  // ada workout planned tapi tanggalnya sudah lewat (sebelum hari ini) & belum completed
   const isMissedDate = (fullDate: Date): boolean => {
     const todayMidnight = new Date();
     todayMidnight.setHours(0, 0, 0, 0);
@@ -52,11 +51,10 @@ const WeekCalendar = () => {
     const dateMidnight = new Date(fullDate);
     dateMidnight.setHours(0, 0, 0, 0);
 
-    if (dateMidnight >= todayMidnight) return false; // hari ini / masa depan → tidak missed
+    if (dateMidnight >= todayMidnight) return false;
 
     const key = toDateKey(fullDate);
     const workouts = workoutsByDate[key] ?? [];
-    // Missed jika ada workout tapi tidak ada yang completed
     return workouts.length > 0 && !workouts.some((w) => w.status === 'completed');
   };
 

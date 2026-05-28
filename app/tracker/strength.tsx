@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useWorkoutStore } from '@/store/workoutStore';
+import { useWorkoutStore } from '@/store/supabaseWorkoutStore';
 
 type SetStatus = 'pending' | 'done';
 type ScreenState = 'preview' | 'exercise' | 'rest' | 'finished';

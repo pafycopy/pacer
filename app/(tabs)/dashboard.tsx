@@ -3,7 +3,6 @@ import { View, StyleSheet, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
 import Header from '@/components/header';
 import { Colors } from '@/constants/theme';
-import { useUserStore } from '@/store/userStore';
 
 import TipsCard            from '@/components/ui/dashboard/tipscard';
 import MonitoringProgress  from '@/components/ui/dashboard/monitoringprogress';
@@ -11,12 +10,12 @@ import WeeklyPlanCard      from '@/components/ui/dashboard/weeklyplancard';
 import StatsRow            from '@/components/ui/dashboard/statsrow';
 import WeeklyActivityLabel from '@/components/ui/dashboard/weeklyactivitylabel';
 import RecentActivityCard  from '@/components/ui/dashboard/recentactivitycard';
-
 import { useDashboardStats } from '@/hooks/usedashboardstats';
+import { useUIEducationStore } from '@/store/uieducationstore';
 
 const Dashboard = () => {
   const router = useRouter();
-  const { avatarUri } = useUserStore();
+  const { openTopic } = useUIEducationStore();
 
   const {
     dataByPeriod,
@@ -30,25 +29,19 @@ const Dashboard = () => {
     tip,
   } = useDashboardStats();
 
-  // Navigasi ke tab Education dan langsung buka topik terkait tips
   const handleTipPress = () => {
-    router.push({
-      pathname: '/(tabs)/education',
-      params: { topicId: String(tip.topicId) },
-    })
-  }
+    openTopic(tip.topicId);          // set sinyal ke store dulu
+    router.navigate('/(tabs)/education' as any); // lalu pindah tab
+  };
 
   return (
     <View style={styles.container}>
-      <Header
-        title="Home"
-      />
+      <Header title="Home" />
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Tips hari ini — klik langsung ke halaman education topik terkait */}
         <TipsCard tip={tip} onPress={handleTipPress} />
 
         <MonitoringProgress
@@ -88,14 +81,8 @@ const Dashboard = () => {
 export default Dashboard;
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.light.background,
-  },
+  container: { flex: 1, backgroundColor: Colors.light.background },
   scrollContent: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 40,
-    gap: 14,
+    paddingHorizontal: 16, paddingTop: 12, paddingBottom: 40, gap: 14,
   },
 });

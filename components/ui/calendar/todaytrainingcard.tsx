@@ -202,7 +202,6 @@ export default function TodayWorkoutCard({
         {/* Header */}
         <View style={styles.cardHeader}>
           <View style={styles.workoutTypeBadge}>
-            <Text style={styles.workoutTypeIcon}>🏃</Text>
             <Text style={styles.workoutTypeText}>{workoutType}</Text>
           </View>
           <View style={styles.headerRight}>

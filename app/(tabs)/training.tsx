@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, Modal } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -10,7 +10,9 @@ import TodayWorkoutCard from '@/components/ui/calendar/todaytrainingcard';
 import WorkoutFormScreen, { WorkoutFormValues, Props as FormProps } from '@/components/ui/calendar/workoutformscreen';
 import TempoRunForm from '@/components/ui/calendar/temporunform';
 import StrengthTrainingForm from '@/components/ui/calendar/strengthtrainingform';
-import { useWorkoutStore, toDateKey, SavedWorkout } from '@/store/workoutStore';
+
+// ✅ semua dari supabaseWorkoutStore
+import { useWorkoutStore, toDateKey, SavedWorkout } from '@/store/supabaseWorkoutStore';
 import { resolveStats } from '@/utils/resolveWorkoutStats';
 
 interface BaseFormProps {
@@ -41,7 +43,13 @@ const training = () => {
     addWorkout,
     updateWorkout,
     deleteWorkout,
+    fetchWorkouts,   // ✅ tambah fetchWorkouts
   } = useWorkoutStore();
+
+  // ✅ Fetch data dari Supabase saat halaman dibuka
+  useEffect(() => {
+    fetchWorkouts();
+  }, []);
 
   const dateKey = toDateKey(selectedDate);
   const todayWorkouts = getWorkoutsByDate(dateKey);
@@ -68,7 +76,6 @@ const training = () => {
 
   const handleEdit = (workout: SavedWorkout) => {
     setEditingWorkout(workout);
-    // Sekarang pakai iconName + iconLib (string) bukan ReactNode
     setSelectedWorkout({
       id: 0,
       label: workout.workoutType,
@@ -125,7 +132,6 @@ const training = () => {
     : null;
 
   const isToday = selectedDate.toDateString() === new Date().toDateString();
-  // Tanggal sudah lewat (bukan hari ini dan sebelum hari ini)
   const todayMidnight = new Date(); todayMidnight.setHours(0,0,0,0);
   const selMidnight = new Date(selectedDate); selMidnight.setHours(0,0,0,0);
   const isPastDate = selMidnight < todayMidnight;

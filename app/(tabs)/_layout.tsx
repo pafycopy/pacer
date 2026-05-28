@@ -1,39 +1,99 @@
-import { View, Text } from 'react-native'
-import { Ionicons } from '@expo/vector-icons'
-import React from 'react'
-import { Tabs } from 'expo-router'
+import React, { useEffect } from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import { Tabs } from 'expo-router';
+
+import { useWorkoutStore } from '@/store/supabaseWorkoutStore';
 
 const Tabslayout = () => {
+
+  // ✅ pindah ke dalam component
+  const fetchWorkouts = useWorkoutStore(
+    (s) => s.fetchWorkouts
+  );
+
+  // ✅ aman
+  useEffect(() => {
+    fetchWorkouts();
+  }, []);
+
   return (
-    <Tabs 
+    <Tabs
       screenOptions={{
-        tabBarActiveTintColor:'#006E2F',
-        tabBarInactiveTintColor:'#191C1E',
         headerShown: false,
+
+        tabBarActiveTintColor: '#006E2F',
+        tabBarInactiveTintColor: '#191C1E',
+
         tabBarStyle: {
-          height: 60, // atur tinggi di sini (coba 50–70)
-          paddingBottom: 5, // biar tidak terlalu tinggi di bawah
-          paddingTop: 5,
+          height: 70,
+          paddingBottom: 8,
+          paddingTop: 8,
         },
+
         tabBarLabelStyle: {
-          fontSize: 12, // kecilkan teks
-        }
+          fontSize: 12,
+        },
       }}
     >
-      <Tabs.Screen name="dashboard" options={{ title: "dashboard",tabBarIcon:({color,size})=>(
-        <Ionicons name="home" color={color} size={size} />
-      ) }} />
-      <Tabs.Screen name="education" options={{ title: "education",tabBarIcon:({color,size})=>(
-        <Ionicons name="library" color={color} size={size} />
-      ) }} />
-      <Tabs.Screen name="training" options={{ title: "training",tabBarIcon:({color,size})=>(
-        <Ionicons name="barbell" color={color} size={size} />
-      ) }} />
-      <Tabs.Screen name="profile" options={{ title: "profile",tabBarIcon:({color,size})=>(
-        <Ionicons name="person" color={color} size={size} />
-      ) }} />
-    </Tabs>
-  )
-}
 
-export default Tabslayout
+      <Tabs.Screen
+        name="dashboard"
+        options={{
+          title: 'dashboard',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons
+              name="home"
+              color={color}
+              size={size}
+            />
+          ),
+        }}
+      />
+
+      <Tabs.Screen
+        name="education"
+        options={{
+          title: 'education',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons
+              name="library"
+              color={color}
+              size={size}
+            />
+          ),
+        }}
+      />
+
+      <Tabs.Screen
+        name="training"
+        options={{
+          title: 'training',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons
+              name="barbell"
+              color={color}
+              size={size}
+            />
+          ),
+        }}
+      />
+
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: 'profile',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons
+              name="person"
+              color={color}
+              size={size}
+            />
+          ),
+        }}
+      />
+
+    </Tabs>
+  );
+};
+
+export default Tabslayout;

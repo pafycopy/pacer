@@ -1,6 +1,5 @@
 import { StyleSheet, View, ScrollView, Modal } from 'react-native'
 import React, { useState, useCallback } from 'react'
-import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useFocusEffect } from '@react-navigation/native'
 
 import Header from '@/components/header'
@@ -15,32 +14,24 @@ import WarmupScreen from '@/components/ui/education/warmupscreen'
 import StrengthScreen from '@/components/ui/education/strengthscreen'
 
 import { educationData, EducationTopic } from '@/constants/educationdata'
+import { useUIEducationStore } from '@/store/uieducationstore'
 
 const Education = () => {
-  const { topicId } = useLocalSearchParams<{ topicId?: string }>()
-  const router = useRouter()
-
   const [selectedTopic, setSelectedTopic] = useState<EducationTopic | null>(null)
+  const { pendingTopicId, clearPendingTopic } = useUIEducationStore()
 
-  // useFocusEffect — jalan setiap kali tab ini aktif/difokus
-  // Jadi kalau dari dashboard bawa topicId, modal langsung terbuka
+  // Setiap kali tab ini aktif, cek apakah ada topic yang perlu dibuka
   useFocusEffect(
     useCallback(() => {
-      if (topicId) {
-        const topic = educationData.find((t) => String(t.id) === topicId)
-        if (topic) {
-          setSelectedTopic(topic)
-          // Hapus topicId dari params setelah diproses
-          // supaya kalau user balik ke tab ini manual, modal tidak terbuka lagi
-          router.setParams({ topicId: undefined })
-        }
-      }
-    }, [topicId])
+      if (pendingTopicId === null) return
+      const topic = educationData.find((t) => t.id === pendingTopicId)
+      clearPendingTopic() // reset setelah dibaca
+      if (topic) setSelectedTopic(topic)
+    }, [pendingTopicId])
   )
 
   const renderScreen = () => {
     if (!selectedTopic) return null
-
     switch (selectedTopic.type) {
       case 'running':
         return <RunningTechniqueScreen topic={selectedTopic} onBack={() => setSelectedTopic(null)} />
@@ -64,7 +55,6 @@ const Education = () => {
         showsVerticalScrollIndicator={false}
       >
         <EducationHero />
-
         {educationData.map((topic) => (
           <EducationCard
             key={topic.id}
@@ -92,13 +82,6 @@ const Education = () => {
 export default Education
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.light.background,
-  },
-  scrollContent: {
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 40,
-  },
+  container: { flex: 1, backgroundColor: Colors.light.background },
+  scrollContent: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 40 },
 })

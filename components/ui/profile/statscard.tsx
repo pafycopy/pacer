@@ -1,5 +1,5 @@
 import { View, Text, StyleSheet } from 'react-native';
-import { useWorkoutStore } from '@/store/workoutStore';
+import { useWorkoutStore } from '@/store/supabaseWorkoutStore';
 
 const StatsCard = () => {
   const { workoutsByDate } = useWorkoutStore();

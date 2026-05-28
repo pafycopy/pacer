@@ -1,7 +1,7 @@
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
-import { useWorkoutStore } from '@/store/workoutStore';
+import { useWorkoutStore } from '@/store/supabaseWorkoutStore';
 
 const DAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 

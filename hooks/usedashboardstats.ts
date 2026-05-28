@@ -1,203 +1,184 @@
 import { useMemo } from 'react';
-import { useWorkoutStore, SavedWorkout, toDateKey } from '@/store/workoutStore';
-import { educationData } from '@/constants/educationdata';
+import { useWorkoutStore } from '@/store/supabaseWorkoutStore';
 
-// ─── Helper: rentang tanggal ──────────────────────────────────────────────
-const getDateRange = (period: 'hari' | 'minggu' | 'bulan' | 'tahun') => {
-  const now   = new Date();
-  const start = new Date(now);
-
-  if (period === 'hari') {
-    start.setHours(0, 0, 0, 0);
-  } else if (period === 'minggu') {
-    const day = now.getDay(); // 0=minggu
-    start.setDate(now.getDate() - day);
-    start.setHours(0, 0, 0, 0);
-  } else if (period === 'bulan') {
-    start.setDate(1);
-    start.setHours(0, 0, 0, 0);
-  } else {
-    start.setMonth(0, 1);
-    start.setHours(0, 0, 0, 0);
-  }
-
-  return { start, end: now };
+// ── Tipe Activity untuk RecentActivityCard ───────────────────────────────
+export type Activity = {
+  id: string;
+  workoutType: string;
+  type: string;
+  label: string;
+  stat: string;
+  statSub?: string;
 };
 
-// ─── Helper: semua workout dalam rentang ─────────────────────────────────
-const getWorkoutsInRange = (
-  workoutsByDate: Record<string, SavedWorkout[]>,
-  start: Date,
-  end: Date
-): SavedWorkout[] => {
-  const result: SavedWorkout[] = [];
-  Object.entries(workoutsByDate).forEach(([dateKey, workouts]) => {
-    const d = new Date(dateKey);
-    if (d >= start && d <= end) {
-      result.push(...workouts);
-    }
-  });
-  return result;
+// ── Helper format tanggal ─────────────────────────────────────────────────
+const formatLabel = (dateKey: string): string => {
+  const date = new Date(dateKey);
+  const today = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
+  if (date.toDateString() === today.toDateString()) return 'Hari ini';
+  if (date.toDateString() === yesterday.toDateString()) return 'Kemarin';
+  return date.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
 };
 
-// ─── Helper: konsistensi minggu ini (%) ──────────────────────────────────
-const calcConsistency = (
-  workoutsByDate: Record<string, SavedWorkout[]>
-): number => {
-  // Hitung 4 minggu terakhir, berapa hari ada workout
-  const totalDays = 28;
-  let activeDays  = 0;
-  for (let i = 0; i < totalDays; i++) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    const key = toDateKey(d);
-    const workouts = workoutsByDate[key] ?? [];
-    if (workouts.some((w) => w.status === 'completed')) activeDays++;
-  }
-  return Math.round((activeDays / totalDays) * 100);
+// ── Tips harian — rotasi setiap hari ─────────────────────────────────────
+// topicId sesuai educationData:
+// 1 = Teknik Berlari, 2 = Pencegahan Cedera, 3 = Pemanasan & Pendinginan, 4 = Latihan Kekuatan
+const TIPS = [
+  { id: 1, topicId: 3, title: 'High Knees', icon: 'walk', iconBg: '#DDFFE2',
+    description: 'Mengaktifkan otot fleksor pinggul dan bokong, serta melatih postur angkatan kaki yang ideal saat berlari.' },
+  { id: 2, topicId: 3, title: 'Butt Kicks', icon: 'body', iconBg: '#E2F0FF',
+    description: 'Melatih otot hamstring dan meningkatkan frekuensi langkah kaki agar lebih efisien saat berlari.' },
+  { id: 3, topicId: 3, title: 'Leg Swings', icon: 'sync', iconBg: '#E2F4FF',
+    description: 'Memanaskan sendi pinggul dan meningkatkan range of motion sebelum lari jarak jauh.' },
+  { id: 4, topicId: 3, title: 'Walking Lunges', icon: 'walk', iconBg: '#FFF2E2',
+    description: 'Mengaktifkan otot paha dan bokong sebagai persiapan sebelum lari agar lebih bertenaga.' },
+  { id: 5, topicId: 3, title: 'Arm Swing', icon: 'arrow-up', iconBg: '#FFEAE2',
+    description: 'Ayunan lengan yang benar membantu menjaga keseimbangan dan efisiensi energi saat berlari.' },
+  { id: 6, topicId: 1, title: 'Postur Tubuh', icon: 'body', iconBg: '#DDFFE2',
+    description: 'Jaga tubuh tegak dengan bahu rileks. Condongkan tubuh sedikit ke depan dari pergelangan kaki.' },
+  { id: 7, topicId: 2, title: 'Cegah Shin Splints', icon: 'fitness', iconBg: '#FFE8E8',
+    description: 'Tingkatkan volume lari secara bertahap maksimal 10% per minggu untuk mencegah shin splints.' },
+  { id: 8, topicId: 4, title: 'Core Stability', icon: 'accessibility', iconBg: '#F2E2FF',
+    description: 'Core yang kuat menjaga postur lari tetap stabil dan mengurangi risiko cedera punggung bawah.' },
+];
+
+// ── Helper hitung awal minggu (Senin) ────────────────────────────────────
+const getWeekStart = (): Date => {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  const day = d.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  d.setDate(d.getDate() + diff);
+  return d;
 };
 
-// ─── Helper: minggu ke-berapa dalam bulan ────────────────────────────────
-const getCurrentWeekOfMonth = (): number => {
-  const now  = new Date();
-  const day  = now.getDate();
-  return Math.ceil(day / 7);
+const getMonthStart = (): Date => {
+  const d = new Date();
+  return new Date(d.getFullYear(), d.getMonth(), 1);
 };
 
-// ─── Helper: sesi completed minggu ini ───────────────────────────────────
-const getWeekSessions = (workoutsByDate: Record<string, SavedWorkout[]>) => {
-  const { start, end } = getDateRange('minggu');
-  const workouts = getWorkoutsInRange(workoutsByDate, start, end);
-  const completed = workouts.filter((w) => w.status === 'completed').length;
-  const total     = workouts.length;
-  return { completed, total };
-};
+const getYearStart = (): Date => new Date(new Date().getFullYear(), 0, 1);
 
-// ─── Helper: format tanggal relatif ──────────────────────────────────────
-const formatRelativeTime = (completedAt: number): string => {
-  const now   = Date.now();
-  const diffMs = now - completedAt;
-  const diffMin = Math.floor(diffMs / 60000);
-  const diffH   = Math.floor(diffMin / 60);
-  const diffD   = Math.floor(diffH / 24);
-
-  if (diffMin < 60) return `${diffMin} menit lalu`;
-  if (diffH   < 24) return `Hari ini, ${new Date(completedAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}`;
-  if (diffD   === 1) return `Kemarin, ${new Date(completedAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}`;
-  return new Date(completedAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
-};
-
-// ─── Helper: icon & warna per workout type ───────────────────────────────
-const resolveWorkoutIcon = (workoutType: string): { icon: string; iconBg: string } => {
-  switch (workoutType) {
-    case 'Easy Run':          return { icon: 'walk',           iconBg: '#D9E2FF' };
-    case 'Long Run':          return { icon: 'walk',           iconBg: '#DDFFE2' };
-    case 'Tempo Run':         return { icon: 'speedometer',    iconBg: '#C8F5C8' };
-    case 'Interval Run':      return { icon: 'timer',          iconBg: '#f3c0c0' };
-    case 'Strength Training': return { icon: 'barbell',        iconBg: '#FFE5D6' };
-    default:                  return { icon: 'fitness',        iconBg: '#F0F0F0' };
-  }
-};
-
-// ─── Helper: stat utama per workout ──────────────────────────────────────
-const resolveActivityStat = (w: SavedWorkout): { stat: string; statSub?: string } => {
-  if (w.trackingResult) {
-    const dist = w.trackingResult.actualDistance;
-    const pace = w.trackingResult.actualPace;
-    if (dist > 0) return { stat: `${dist.toFixed(2)} km`, statSub: pace !== '--' ? pace : undefined };
-    const dur = w.trackingResult.actualDuration;
-    if (dur > 0) {
-      const m = Math.floor(dur / 60);
-      const s = dur % 60;
-      return { stat: `${m}:${String(s).padStart(2, '0')}` };
-    }
-  }
-  return { stat: '-' };
-};
-
-// ─── Tips rotasi dari educationData (bawa topicId untuk navigasi) ────────
-const getTipOfDay = () => {
-  const allLessons = educationData.flatMap((topic) =>
-    topic.lessons.map((lesson) => ({
-      id:          lesson.id,
-      topicId:     topic.id,   // ← untuk navigasi dari dashboard ke education
-      title:       lesson.title,
-      description: lesson.description,
-      icon:        topic.icon,
-      iconBg:      topic.color,
-    }))
-  );
-  const idx = new Date().getDate() % allLessons.length;
-  return allLessons[idx];
-};
-
-// ─── Main hook ────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────
 export const useDashboardStats = () => {
   const { workoutsByDate } = useWorkoutStore();
 
   return useMemo(() => {
-    // Stats per periode
-    const periods = ['hari', 'minggu', 'bulan', 'tahun'] as const;
-    const dataByPeriod = Object.fromEntries(
-      periods.map((period) => {
-        const { start, end } = getDateRange(period);
-        const workouts       = getWorkoutsInRange(workoutsByDate, start, end);
-        const completed      = workouts.filter((w) => w.status === 'completed');
-        const totalDistance  = completed.reduce(
-          (sum, w) => sum + (w.trackingResult?.actualDistance ?? 0), 0
-        );
-        return [period, {
-          workout:  completed.length,
-          distance: parseFloat(totalDistance.toFixed(2)),
-        }];
-      })
-    ) as Record<typeof periods[number], { workout: number; distance: number }>;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const weekStart  = getWeekStart();
+    const monthStart = getMonthStart();
+    const yearStart  = getYearStart();
 
-    // Konsistensi
-    const consistencyPercent = calcConsistency(workoutsByDate);
+    // ── Akumulasi stats ───────────────────────────────────────────────────
+    const dataByPeriod = {
+      hari:   { workout: 0, distance: 0 },
+      minggu: { workout: 0, distance: 0 },
+      bulan:  { workout: 0, distance: 0 },
+      tahun:  { workout: 0, distance: 0 },
+    };
 
-    // Sesi minggu ini
-    const { completed: completedSessions, total: totalSessions } = getWeekSessions(workoutsByDate);
+    let totalPlannedWeek = 0;
+    let completedWeek = 0;
 
-    // Aktivitas terakhir (max 5, hanya completed)
-    const allCompleted = Object.entries(workoutsByDate)
-      .flatMap(([, workouts]) => workouts)
-      .filter((w) => w.status === 'completed' && w.trackingResult?.completedAt)
-      .sort((a, b) => (b.trackingResult!.completedAt) - (a.trackingResult!.completedAt))
-      .slice(0, 5);
+    const recentActivities: Activity[] = [];
 
-    const recentActivities = allCompleted.map((w) => ({
-      id:       w.uid,
-      type:     w.workoutName || w.workoutType,
-      label:    formatRelativeTime(w.trackingResult!.completedAt),
-      ...resolveWorkoutIcon(w.workoutType),
-      ...resolveActivityStat(w),
-    }));
+    Object.entries(workoutsByDate).forEach(([dateKey, workouts]) => {
+      const date = new Date(dateKey);
+      date.setHours(0, 0, 0, 0);
 
-    // Pesan monitoring
+      const isToday  = date.getTime() === today.getTime();
+      const isWeek   = date >= weekStart;
+      const isMonth  = date >= monthStart;
+      const isYear   = date >= yearStart;
+
+      workouts.forEach((w) => {
+        // Planned minggu ini (untuk weekly plan)
+        if (isWeek) {
+          totalPlannedWeek += 1;
+          if (w.status === 'completed') completedWeek += 1;
+        }
+
+        if (w.status !== 'completed') return;
+
+        const dist = w.trackingResult?.actualDistance ?? 0;
+
+        if (isToday)  { dataByPeriod.hari.workout++;   dataByPeriod.hari.distance += dist; }
+        if (isWeek)   { dataByPeriod.minggu.workout++;  dataByPeriod.minggu.distance += dist; }
+        if (isMonth)  { dataByPeriod.bulan.workout++;   dataByPeriod.bulan.distance += dist; }
+        if (isYear)   { dataByPeriod.tahun.workout++;   dataByPeriod.tahun.distance += dist; }
+
+        // Recent activities
+        const isStrength = w.workoutType === 'Strength Training';
+        const exerciseCount = w.selectedExercises?.length ?? 0;
+        const totalSets = w.selectedExercises?.reduce((acc, ex) => acc + (ex.sets?.length ?? 0), 0) ?? 0;
+
+        const stat = isStrength
+          ? `${exerciseCount} exercise`
+          : dist > 0 ? `${dist.toFixed(1)} km` : '-';
+
+        const statSub = isStrength
+          ? `${totalSets} sets`
+          : w.trackingResult?.actualPace
+          ? `${w.trackingResult.actualPace}/km`
+          : undefined;
+
+        recentActivities.push({
+          id: w.uid,
+          workoutType: w.workoutType,
+          type: w.workoutName,
+          label: formatLabel(dateKey),
+          stat,
+          statSub,
+        });
+      });
+    });
+
+    // Bulatkan jarak
+    Object.keys(dataByPeriod).forEach((k) => {
+      const key = k as keyof typeof dataByPeriod;
+      dataByPeriod[key].distance = Math.round(dataByPeriod[key].distance * 10) / 10;
+    });
+
+    // Urutkan terbaru, ambil 5
+    recentActivities.sort((a, b) => b.id.localeCompare(a.id));
+    const displayed = recentActivities.slice(0, 5);
+
+    // ── Konsistensi ───────────────────────────────────────────────────────
+    const consistencyPercent = totalPlannedWeek > 0
+      ? Math.round((completedWeek / totalPlannedWeek) * 100)
+      : 0;
+
     const consistencyMsg =
-      consistencyPercent >= 80
-        ? `Kamu sudah ${consistencyPercent}% konsisten bulan ini! Pertahankan ritmenya.`
-        : consistencyPercent >= 50
-        ? `Konsistensimu ${consistencyPercent}% bulan ini. Sedikit lagi untuk mencapai target!`
-        : `Konsistensimu ${consistencyPercent}% bulan ini. Yuk mulai rutin berolahraga!`;
+      consistencyPercent >= 80 ? `Kamu sudah ${consistencyPercent}% konsisten minggu ini! Pertahankan ritmenya.`
+      : consistencyPercent >= 50 ? `Kamu ${consistencyPercent}% konsisten minggu ini. Ayo tingkatkan!`
+      : 'Mulai rencanakan latihan minggu ini untuk membangun konsistensi.';
 
-    // Weekly activity label
+    // ── Weekly plan ───────────────────────────────────────────────────────
+    const weekNum = Math.ceil((today.getDate()) / 7);
+    const currentWeek = Math.min(weekNum, 4);
+
+    // ── Weekly label ─────────────────────────────────────────────────────
     const weeklyLabel =
-      consistencyPercent >= 80 ? 'Bagus!' :
-      consistencyPercent >= 50 ? 'Lumayan!' : 'Ayo semangat!';
+      dataByPeriod.minggu.workout >= 5 ? 'Luar Biasa! 🔥'
+      : dataByPeriod.minggu.workout >= 3 ? 'Bagus!'
+      : dataByPeriod.minggu.workout >= 1 ? 'Mulai Bagus'
+      : 'Ayo Mulai';
 
-    // Tip hari ini
-    const tip = getTipOfDay();
+    // ── Tips hari ini (rotasi harian) ─────────────────────────────────────
+    const dayOfYear = Math.floor((today.getTime() - new Date(today.getFullYear(), 0, 0).getTime()) / 86400000);
+    const tip = TIPS[dayOfYear % TIPS.length];
 
     return {
       dataByPeriod,
       consistencyPercent,
       consistencyMsg,
-      completedSessions,
-      totalSessions: Math.max(totalSessions, 1),
-      currentWeek: getCurrentWeekOfMonth(),
-      recentActivities,
+      completedSessions: completedWeek,
+      totalSessions: Math.max(totalPlannedWeek, 1),
+      currentWeek,
+      recentActivities: displayed,
       weeklyLabel,
       tip,
     };

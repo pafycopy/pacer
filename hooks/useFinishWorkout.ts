@@ -1,6 +1,6 @@
 import { useRef } from 'react';
 import { useRouter } from 'expo-router';
-import { useWorkoutStore } from '@/store/workoutStore';
+import { useWorkoutStore } from '@/store/supabaseWorkoutStore';
 
 type BaseResult = {
   actualDistance: number;

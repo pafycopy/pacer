@@ -46,7 +46,8 @@
           "photosPermission": "Izinkan Pacer mengakses galeri untuk foto profil.",
           "cameraPermission": "Izinkan Pacer menggunakan kamera untuk foto profil."
         }
-      ]
+      ],
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true,
