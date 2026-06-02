@@ -1,19 +1,46 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Modal } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  Modal,
+} from 'react-native';
+
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+
 import Header from '@/components/header';
 import WeekCalendar from '@/components/ui/calendar/weekcalendar';
+
 import { Colors } from '@/constants/theme';
-import TrainingType, { WorkoutType } from '@/components/ui/calendar/trainingtype';
+
+import TrainingType, {
+  WorkoutType,
+} from '@/components/ui/calendar/trainingtype';
+
 import TodayWorkoutCard from '@/components/ui/calendar/todaytrainingcard';
-import WorkoutFormScreen, { WorkoutFormValues, Props as FormProps } from '@/components/ui/calendar/workoutformscreen';
+
+import WorkoutFormScreen, {
+  WorkoutFormValues,
+  Props as FormProps,
+} from '@/components/ui/calendar/workoutformscreen';
+
 import TempoRunForm from '@/components/ui/calendar/temporunform';
 import StrengthTrainingForm from '@/components/ui/calendar/strengthtrainingform';
 
-// ✅ semua dari supabaseWorkoutStore
-import { useWorkoutStore, toDateKey, SavedWorkout } from '@/store/supabaseWorkoutStore';
+// ✅ tetap pakai supabase store lama
+import {
+  useWorkoutStore,
+  toDateKey,
+  SavedWorkout,
+} from '@/store/supabaseWorkoutStore';
+
 import { resolveStats } from '@/utils/resolveWorkoutStats';
+
+// ─────────────────────────────────────────────
+// FORM REGISTRY
+// ─────────────────────────────────────────────
 
 interface BaseFormProps {
   workout: any;
@@ -22,60 +49,128 @@ interface BaseFormProps {
   onSave: (values: any) => void;
 }
 
-const FORM_REGISTRY: Record<string, React.ComponentType<BaseFormProps>> = {
-  'Tempo Run': TempoRunForm as React.ComponentType<BaseFormProps>,
-  'Strength Training': StrengthTrainingForm as React.ComponentType<BaseFormProps>,
+const FORM_REGISTRY: Record<
+  string,
+  React.ComponentType<BaseFormProps>
+> = {
+  'Tempo Run':
+    TempoRunForm as React.ComponentType<BaseFormProps>,
+
+  'Strength Training':
+    StrengthTrainingForm as React.ComponentType<BaseFormProps>,
 };
 
+// ─────────────────────────────────────────────
+// TRACKER REGISTRY
+// ─────────────────────────────────────────────
+
 const TRACKER_REGISTRY: Record<string, string> = {
-  'Easy Run':          '/tracker/running',
-  'Long Run':          '/tracker/running',
-  'Tempo Run':         '/tracker/tempo',
-  'Interval Run':      '/tracker/interval',
+  'Easy Run': '/tracker/running',
+  'Long Run': '/tracker/running',
+  'Tempo Run': '/tracker/tempo',
+  'Interval Run': '/tracker/interval',
   'Strength Training': '/tracker/strength',
 };
 
-const training = () => {
+// ─────────────────────────────────────────────
+// SCREEN
+// ─────────────────────────────────────────────
+
+const Training = () => {
+
   const router = useRouter();
+
   const {
     selectedDate,
+    workoutsByDate, // <-- TAMBAHKAN INI agar halaman re-render saat data berubah
     getWorkoutsByDate,
     addWorkout,
     updateWorkout,
     deleteWorkout,
-    fetchWorkouts,   // ✅ tambah fetchWorkouts
+    fetchWorkouts,
   } = useWorkoutStore();
 
-  // ✅ Fetch data dari Supabase saat halaman dibuka
+  // ✅ fetch supabase
   useEffect(() => {
     fetchWorkouts();
   }, []);
 
   const dateKey = toDateKey(selectedDate);
-  const todayWorkouts = getWorkoutsByDate(dateKey);
 
-  const [formVisible, setFormVisible] = useState(false);
-  const [selectedWorkout, setSelectedWorkout] = useState<WorkoutType | null>(null);
-  const [editingWorkout, setEditingWorkout] = useState<SavedWorkout | null>(null);
+  const todayWorkouts =
+    getWorkoutsByDate(dateKey);
 
-  const handleSelectTraining = (workout: WorkoutType) => {
+  // ✅ fitur baru:
+  // workout hanya bisa dimainkan hari ini
+
+  const todayKey = toDateKey(new Date());
+
+  const isSelectedToday =
+    todayKey === dateKey;
+
+  // ─────────────────────────
+
+  const [formVisible, setFormVisible] =
+    useState(false);
+
+  const [selectedWorkout, setSelectedWorkout] =
+    useState<WorkoutType | null>(null);
+
+  const [editingWorkout, setEditingWorkout] =
+    useState<SavedWorkout | null>(null);
+
+  // ─────────────────────────
+  // SELECT TRAINING
+  // ─────────────────────────
+
+  const handleSelectTraining = (
+    workout: WorkoutType
+  ) => {
+
     setEditingWorkout(null);
+
     setSelectedWorkout(workout);
+
     setFormVisible(true);
   };
 
-  const handleSave = (data: WorkoutFormValues) => {
+  // ─────────────────────────
+  // SAVE
+  // ─────────────────────────
+
+  const handleSave = (
+    data: WorkoutFormValues
+  ) => {
+
     if (editingWorkout) {
-      updateWorkout(dateKey, editingWorkout.uid, data);
+
+      updateWorkout(
+        dateKey,
+        editingWorkout.uid,
+        data
+      );
+
     } else {
+
       addWorkout(dateKey, data);
+
     }
+
     setFormVisible(false);
+
     setEditingWorkout(null);
   };
 
-  const handleEdit = (workout: SavedWorkout) => {
+  // ─────────────────────────
+  // EDIT
+  // ─────────────────────────
+
+  const handleEdit = (
+    workout: SavedWorkout
+  ) => {
+
     setEditingWorkout(workout);
+
     setSelectedWorkout({
       id: 0,
       label: workout.workoutType,
@@ -84,85 +179,169 @@ const training = () => {
       iconBg: '#E8E8E8',
       icon: 'directions-run',
     });
+
     setFormVisible(true);
   };
+
+  // ─────────────────────────
+  // DELETE
+  // ─────────────────────────
 
   const handleDelete = (uid: string) => {
     deleteWorkout(dateKey, uid);
   };
 
-  const handleStartWorkout = (workout: SavedWorkout) => {
-    const trackerPath = TRACKER_REGISTRY[workout.workoutType];
+  // ─────────────────────────
+  // START WORKOUT
+  // ─────────────────────────
+
+  const handleStartWorkout = (
+    workout: SavedWorkout
+  ) => {
+
+    const trackerPath =
+      TRACKER_REGISTRY[workout.workoutType];
+
     if (!trackerPath) return;
 
     router.push({
       pathname: trackerPath as any,
+
       params: {
         uid: workout.uid,
         dateKey,
+
         workoutType: workout.workoutType,
         workoutName: workout.workoutName,
 
-        ...(workout.workoutType === 'Interval Run' && {
+        ...(workout.workoutType ===
+          'Interval Run' && {
+
           distance: workout.distance,
           pace: workout.pace,
           reps: workout.reps,
           restTime: workout.restTime,
         }),
 
-        ...(workout.workoutType === 'Tempo Run' &&
-          workout.warmup && workout.tempo && workout.cooldown && {
-            warmupDistance:   workout.warmup.distance,
-            warmupPace:       workout.warmup.pace,
-            tempoDistance:    workout.tempo.distance,
-            targetPace:       workout.tempo.targetPace,
-            cooldownDistance: workout.cooldown.distance,
-            cooldownPace:     workout.cooldown.pace,
-          }),
+        ...(workout.workoutType ===
+          'Tempo Run' &&
 
-        ...(workout.workoutType === 'Strength Training' && {
-          selectedExercises: JSON.stringify(workout.selectedExercises ?? []),
+          workout.warmup &&
+          workout.tempo &&
+          workout.cooldown && {
+
+          warmupDistance:
+            workout.warmup.distance,
+
+          warmupPace:
+            workout.warmup.pace,
+
+          tempoDistance:
+            workout.tempo.distance,
+
+          targetPace:
+            workout.tempo.targetPace,
+
+          cooldownDistance:
+            workout.cooldown.distance,
+
+          cooldownPace:
+            workout.cooldown.pace,
+        }),
+
+        ...(workout.workoutType ===
+          'Strength Training' && {
+
+          selectedExercises: JSON.stringify(
+            workout.selectedExercises ?? []
+          ),
         }),
       },
     });
   };
 
-  const ActiveForm = selectedWorkout
-    ? ((FORM_REGISTRY[selectedWorkout.label] ?? WorkoutFormScreen) as React.ComponentType<FormProps>)
-    : null;
+  // ─────────────────────────
 
-  const isToday = selectedDate.toDateString() === new Date().toDateString();
-  const todayMidnight = new Date(); todayMidnight.setHours(0,0,0,0);
-  const selMidnight = new Date(selectedDate); selMidnight.setHours(0,0,0,0);
-  const isPastDate = selMidnight < todayMidnight;
+  const ActiveForm =
+    selectedWorkout
+      ? (
+          FORM_REGISTRY[
+            selectedWorkout.label
+          ] ?? WorkoutFormScreen
+        ) as React.ComponentType<FormProps>
+      : null;
+
+  // ─────────────────────────
+  // DATE LOGIC
+  // ─────────────────────────
+
+  const isToday =
+    selectedDate.toDateString() ===
+    new Date().toDateString();
+
+  const todayMidnight = new Date();
+
+  todayMidnight.setHours(0, 0, 0, 0);
+
+  const selMidnight = new Date(selectedDate);
+
+  selMidnight.setHours(0, 0, 0, 0);
+
+  const isPastDate =
+    selMidnight < todayMidnight;
+
   const sectionTitle = isToday
     ? 'Today'
-    : selectedDate.toLocaleDateString('id-ID', {
-        weekday: 'long', day: 'numeric', month: 'long',
-      });
+    : selectedDate.toLocaleDateString(
+        'id-ID',
+        {
+          weekday: 'long',
+          day: 'numeric',
+          month: 'long',
+        }
+      );
+
+  // ─────────────────────────
+  // RENDER
+  // ─────────────────────────
 
   return (
     <View style={styles.container}>
-      <Header title="Calendar"/>
+
+      <Header title="Calendar" />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={
+          styles.scrollContent
+        }
       >
+
         <WeekCalendar />
 
         <View style={styles.todaySection}>
-          <Text style={styles.sectionTitle}>{sectionTitle}</Text>
+
+          <Text style={styles.sectionTitle}>
+            {sectionTitle}
+          </Text>
 
           {todayWorkouts.length === 0 ? (
+
             <TodayWorkoutCard isEmpty />
+
           ) : (
+
             todayWorkouts.map((workout) => (
+
               <TodayWorkoutCard
                 key={workout.uid}
+
                 workoutType={workout.workoutType}
+
                 workoutName={workout.workoutName}
+
                 stats={resolveStats(workout)}
+
                 status={
                   workout.status === 'completed'
                     ? 'completed'
@@ -171,6 +350,21 @@ const training = () => {
                     : 'planned'
                 }
 
+                // ✅ fitur baru
+                onStartPress={
+                  isSelectedToday &&
+                  workout.status !== 'completed'
+                    ? () =>
+                        handleStartWorkout(workout)
+                    : undefined
+                }
+
+                startDisabled={
+                  !isSelectedToday ||
+                  workout.status === 'completed'
+                }
+
+                // pace
                 paceResult={
                   workout.trackingResult &&
                   workout.pace &&
@@ -178,103 +372,189 @@ const training = () => {
                   workout.workoutType !== 'Tempo Run' &&
                   workout.workoutType !== 'Interval Run'
                     ? {
-                        targetPace: workout.pace,
-                        actualPace: workout.trackingResult.actualPace,
-                        targetDistance: workout.distance,
-                        actualDistance: workout.trackingResult.actualDistance,
+                        targetPace:
+                          workout.pace,
+
+                        actualPace:
+                          workout.trackingResult.actualPace,
+
+                        targetDistance:
+                          workout.distance,
+
+                        actualDistance:
+                          workout.trackingResult.actualDistance,
                       }
                     : undefined
                 }
 
+                // tempo
                 tempoResult={
-                  workout.workoutType === 'Tempo Run' &&
-                  workout.trackingResult?.phaseResults &&
-                  workout.warmup && workout.tempo && workout.cooldown
+                  workout.workoutType ===
+                    'Tempo Run' &&
+                  workout.trackingResult
+                    ?.phaseResults &&
+                  workout.warmup &&
+                  workout.tempo &&
+                  workout.cooldown
                     ? {
                         phases: [
                           {
-                            label: '🔥 WARM UP',
-                            targetDistance: workout.warmup.distance,
-                            actualDistance: workout.trackingResult.phaseResults.warmup.actualDistance,
-                            targetPace: workout.warmup.pace,
-                            actualPace: workout.trackingResult.phaseResults.warmup.actualPace,
-                          },
-                          {
-                            label: '⚡ TEMPO SESSION',
-                            targetDistance: workout.tempo.distance,
-                            actualDistance: workout.trackingResult.phaseResults.tempo.actualDistance,
-                            targetPace: workout.tempo.targetPace,
-                            actualPace: workout.trackingResult.phaseResults.tempo.actualPace,
-                          },
-                          {
-                            label: '❄️ COOL DOWN',
-                            targetDistance: workout.cooldown.distance,
-                            actualDistance: workout.trackingResult.phaseResults.cooldown.actualDistance,
-                            targetPace: workout.cooldown.pace,
-                            actualPace: workout.trackingResult.phaseResults.cooldown.actualPace,
+                            label:
+                              '🔥 WARM UP',
+
+                            targetDistance:
+                              workout.warmup.distance,
+
+                            actualDistance:
+                              workout
+                                .trackingResult
+                                .phaseResults
+                                .warmup
+                                .actualDistance,
+
+                            targetPace:
+                              workout.warmup.pace,
+
+                            actualPace:
+                              workout
+                                .trackingResult
+                                .phaseResults
+                                .warmup
+                                .actualPace,
                           },
                         ],
                       }
                     : undefined
                 }
 
+                // interval
                 intervalResult={
-                  workout.workoutType === 'Interval Run' &&
-                  workout.trackingResult?.repResults
+                  workout.workoutType ===
+                    'Interval Run' &&
+                  workout.trackingResult
+                    ?.repResults
                     ? {
-                        targetDistance: parseFloat(workout.distance ?? '0'),
-                        targetPace: workout.pace ?? '0',
-                        reps: workout.trackingResult.repResults,
+                        targetDistance:
+                          parseFloat(
+                            workout.distance ?? '0'
+                          ),
+
+                        targetPace:
+                          workout.pace ?? '0',
+
+                        reps:
+                          workout.trackingResult
+                            .repResults,
                       }
                     : undefined
                 }
 
-                onStartPress={() => handleStartWorkout(workout)}
-                onEdit={() => handleEdit(workout)}
-                onDelete={() => handleDelete(workout.uid)}
+                onEdit={() =>
+                  handleEdit(workout)
+                }
+
+                onDelete={() =>
+                  handleDelete(workout.uid)
+                }
               />
+
             ))
           )}
         </View>
 
         <Text style={styles.title}>
-          <Ionicons name="add-sharp" size={24} color="#000" /> Tambah latihan
+          <Ionicons
+            name="add-sharp"
+            size={24}
+            color="#000"
+          />
+
+          {' '}Tambah latihan
         </Text>
 
-        <TrainingType onSelect={handleSelectTraining} />
+        <TrainingType
+          onSelect={handleSelectTraining}
+        />
+
       </ScrollView>
+
+      {/* FORM MODAL */}
 
       <Modal
         visible={formVisible}
         animationType="slide"
         presentationStyle="fullScreen"
-        onRequestClose={() => setFormVisible(false)}
+        onRequestClose={() =>
+          setFormVisible(false)
+        }
       >
-        {selectedWorkout && ActiveForm && (
+
+        {selectedWorkout &&
+          ActiveForm && (
+
           <ActiveForm
             workout={selectedWorkout}
-            initialValues={editingWorkout ?? undefined}
-            onBack={() => { setFormVisible(false); setEditingWorkout(null); }}
+
+            initialValues={
+              editingWorkout ?? undefined
+            }
+
+            onBack={() => {
+              setFormVisible(false);
+              setEditingWorkout(null);
+            }}
+
             onSave={handleSave}
           />
         )}
+
       </Modal>
+
     </View>
   );
 };
 
-export default training;
+export default Training;
+
+// ─────────────────────────────────────────────
+// STYLES
+// ─────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.light.background },
-  scrollContent: { paddingBottom: 40 },
-  todaySection: { paddingHorizontal: 16, marginTop: 20, gap: 12 },
-  sectionTitle: {
-    fontSize: 22, fontWeight: '800', color: '#1A1A2E',
-    letterSpacing: -0.5, marginBottom: 4,
+  container: {
+    flex: 1,
+    backgroundColor: Colors.light.background,
   },
+
+  scrollContent: {
+    paddingBottom: 40,
+  },
+
+  todaySection: {
+    paddingHorizontal: 16,
+    marginTop: 20,
+    gap: 12,
+  },
+
+  sectionTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#1A1A2E',
+
+    letterSpacing: -0.5,
+
+    marginBottom: 4,
+  },
+
   title: {
-    padding: 12, marginLeft: 16, marginTop: 16,
-    textAlign: 'left', fontSize: 16, fontWeight: 'bold',
+    padding: 12,
+
+    marginLeft: 16,
+    marginTop: 16,
+
+    textAlign: 'left',
+
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });

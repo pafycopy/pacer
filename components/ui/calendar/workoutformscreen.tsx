@@ -27,6 +27,7 @@ export type WorkoutFormValues = {
   reps: string;
   restTime: string;
   weight: string;
+  isGenerated?: boolean;
   duration: { hour: number; min: number; sec: number };
   notes: string;
   warmup?: { distance: string; pace: string };

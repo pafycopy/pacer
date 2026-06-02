@@ -1,15 +1,78 @@
 import React, { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
-  StyleSheet, ScrollView, SafeAreaView, StatusBar,
+  StyleSheet, ScrollView, SafeAreaView, StatusBar, Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import Svg, { Path, G, ClipPath, Defs, Rect } from 'react-native-svg';
 import {
   EXERCISES, CATEGORY_CONFIG, CATEGORIES,
   ExerciseCategory, Exercise, SelectedExercise,
   makeDefaultSet, getSetsLabel,
 } from '@/constants/strengthdata';
 import { WorkoutFormValues } from '@/components/ui/calendar/workoutformscreen';
+
+
+// ── Icon SVG inline ──────────────────────────────────────────────────────────
+type IconProps = { color?: string; size?: number };
+
+const StrengthIcon = ({ color = '#000', size = 24 }: IconProps) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Defs><ClipPath id="cl_s"><Rect width="24" height="24" fill="white" /></ClipPath></Defs>
+    <G clipPath="url(#cl_s)">
+      <Path d="M2 12H3" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <Path d="M6 8H4C3.73 8 3.48 8.1 3.29 8.29C3.1 8.48 3 8.73 3 9V15C3 15.26 3.1 15.52 3.29 15.7C3.48 15.89 3.73 16 4 16H6" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <Path d="M6 7V17C6 17.26 6.1 17.52 6.29 17.7C6.48 17.89 6.73 18 7 18H8C8.26 18 8.52 17.89 8.7 17.7C8.89 17.52 9 17.26 9 17V7C9 6.73 8.89 6.48 8.7 6.29C8.52 6.1 8.26 6 8 6H7C6.73 6 6.48 6.1 6.29 6.29C6.1 6.48 6 6.73 6 7Z" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <Path d="M9 12H15" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <Path d="M15 7V17C15 17.26 15.1 17.52 15.29 17.7C15.48 17.89 15.73 18 16 18H17C17.26 18 17.52 17.89 17.7 17.7C17.89 17.52 18 17.26 18 17V7C18 6.73 17.89 6.48 17.7 6.29C17.52 6.1 17.26 6 17 6H16C15.73 6 15.48 6.1 15.29 6.29C15.1 6.48 15 6.73 15 7Z" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <Path d="M18 8H20C20.26 8 20.52 8.1 20.7 8.29C20.89 8.48 21 8.73 21 9V15C21 15.26 20.89 15.52 20.7 15.7C20.52 15.89 20.26 16 20 16H18" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <Path d="M22 12H21" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </G>
+  </Svg>
+);
+
+const CoreIcon = ({ color = '#000', size = 24 }: IconProps) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Defs><ClipPath id="cl_c"><Rect width="24" height="24" fill="white" /></ClipPath></Defs>
+    <G clipPath="url(#cl_c)">
+      <Path d="M7 7C7 7.26 7.1 7.52 7.29 7.7C7.48 7.89 7.73 8 8 8C8.26 8 8.52 7.89 8.7 7.7C8.89 7.52 9 7.26 9 7C9 6.73 8.89 6.48 8.7 6.29C8.52 6.1 8.26 6 8 6C7.73 6 7.48 6.1 7.29 6.29C7.1 6.48 7 6.73 7 7Z" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <Path d="M13 21L14 12L21 6" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <Path d="M3 11H9L14 12" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <Path d="M11.5 8.5L16 5" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </G>
+  </Svg>
+);
+
+const MobilityIcon = ({ color = '#000', size = 24 }: IconProps) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Defs><ClipPath id="cl_m"><Rect width="24" height="24" fill="white" /></ClipPath></Defs>
+    <G clipPath="url(#cl_m)">
+      <Path d="M6.5 21L10 16" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <Path d="M5 11L12 9" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <Path d="M16 21L12 14V9L19 5" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <Path d="M9.59 7.41C9.21 7.03 9 6.53 9 6C9 5.46 9.21 4.96 9.59 4.58C9.96 4.21 10.47 4 11 4C11.53 4 12.04 4.21 12.42 4.58C12.79 4.96 13 5.46 13 6C13 6.53 12.79 7.03 12.42 7.41C12.04 7.78 11.53 8 11 8C10.47 8 9.96 7.78 9.59 7.41Z" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </G>
+  </Svg>
+);
+
+const RecoveryIcon = ({ color = '#000', size = 24 }: IconProps) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Defs><ClipPath id="cl_r"><Rect width="24" height="24" fill="white" /></ClipPath></Defs>
+    <G clipPath="url(#cl_r)">
+      <Path d="M15 5C15 5.26 15.1 5.52 15.29 5.7C15.48 5.89 15.73 6 16 6C16.26 6 16.52 5.89 16.7 5.7C16.89 5.52 17 5.26 17 5C17 4.73 16.89 4.48 16.7 4.29C16.52 4.1 16.26 4 16 4C15.73 4 15.48 4.1 15.29 4.29C15.1 4.48 15 4.73 15 5Z" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <Path d="M5 20L10 19.5L11 17.5" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <Path d="M18 20V15H12.5L15 8.5L9.5 9.5L11 11.5" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </G>
+  </Svg>
+);
+
+const CATEGORY_ICONS: Record<string, (props: IconProps) => React.ReactElement> = {
+  Strength: StrengthIcon,
+  Core:     CoreIcon,
+  Mobility: MobilityIcon,
+  Recovery: RecoveryIcon,
+};
+// ─────────────────────────────────────────────────────────────────────────────
 
 type Props = {
   initialValues?: WorkoutFormValues;
@@ -19,7 +82,11 @@ type Props = {
 
 // ─── Preview Screen ───────────────────────────────────────────────────────────
 type PreviewExercise = {
-  id: string; name: string; setsLabel: string; inputType: 'reps' | 'duration';
+  id: string;
+  name: string;
+  setsLabel: string;
+  inputType: 'reps' | 'duration';
+  gifUrl?: string;
 };
 
 type IntensityLevel = 'Light' | 'Moderate' | 'High';
@@ -68,7 +135,11 @@ function WorkoutPreview({ badge, programTitle, durationMins, totalSets, exercise
           {exercises.map((ex) => (
             <View key={ex.id} style={ps.exerciseCard}>
               <View style={ps.thumbnail}>
-                <Ionicons name="barbell-outline" size={22} color="#CCC" />
+                {ex.gifUrl ? (
+                  <Image source={{ uri: ex.gifUrl }} style={ps.thumbnailImage} resizeMode="cover" />
+                ) : (
+                  <Ionicons name="barbell-outline" size={22} color="#CCC" />
+                )}
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={ps.exerciseName}>{ex.name}</Text>
@@ -184,7 +255,8 @@ export default function StrengthTrainingForm({ initialValues, onBack, onSave }: 
       selectedExercises: selectedExercises.map((e) => ({
         id: e.exercise.id,
         name: e.exercise.name,
-        inputType: e.exercise.inputType,  // ← kirim inputType ke tracker
+        inputType: e.exercise.inputType,
+        gifUrl: e.exercise.gifUrl ?? null,   // ← kirim gifUrl ke tracker
         sets: e.sets.map((s) => ({ set: s.set, reps: s.reps, duration: s.duration, kg: s.kg })),
       })),
     };
@@ -202,6 +274,7 @@ export default function StrengthTrainingForm({ initialValues, onBack, onSave }: 
       name: e.exercise.name,
       setsLabel: getSetsLabel(e.exercise, e.sets),
       inputType: e.exercise.inputType,
+      gifUrl: e.exercise.gifUrl,
     }));
     return (
       <WorkoutPreview
@@ -247,7 +320,15 @@ export default function StrengthTrainingForm({ initialValues, onBack, onSave }: 
                 <View style={[fs.radio, active && { borderColor: '#2E7D32' }]}>
                   {active && <View style={fs.radioDot} />}
                 </View>
-                <Text style={[fs.contextLabel, active && fs.contextLabelActive]}>{cfg.icon} {cat}</Text>
+                <View style={fs.categoryTabContent}>
+                  {(() => {
+                    const IconComp = CATEGORY_ICONS[cat];
+                    return IconComp ? (
+                      <IconComp size={16} color={active ? '#fff' : cfg.color} />
+                    ) : null;
+                  })()}
+                  <Text style={[fs.contextLabel, active && fs.contextLabelActive]}>{cat}</Text>
+                </View>
               </TouchableOpacity>
             );
           })}
@@ -394,6 +475,7 @@ const ps = StyleSheet.create({
   exerciseList: { gap: 10 },
   exerciseCard: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#FFFFFF', borderRadius: 16, padding: 14 },
   thumbnail: { width: 52, height: 52, borderRadius: 12, backgroundColor: '#F4F4F4', alignItems: 'center', justifyContent: 'center' },
+  thumbnailImage: { width: '100%', height: '100%', borderRadius: 12 },
   exerciseName: { fontSize: 15, fontWeight: '700', color: '#1A1A2E' },
   exerciseSets: { fontSize: 13, color: '#888', fontWeight: '500', marginTop: 2 },
   typeBadge: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#FFF1EC', borderRadius: 20, paddingHorizontal: 8, paddingVertical: 4 },
@@ -417,6 +499,11 @@ const fs = StyleSheet.create({
   contextItemActive: { borderColor: '#2E7D32', backgroundColor: '#F0FFF4' },
   radio: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: '#CCCCCC', alignItems: 'center', justifyContent: 'center' },
   radioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#2E7D32' },
+  categoryTabContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
   contextLabel: { fontSize: 15, fontWeight: '500', color: '#555' },
   contextLabelActive: { fontWeight: '700', color: '#1A1A2E' },
   catDescBox: { borderLeftWidth: 3, paddingLeft: 12, paddingVertical: 4 },

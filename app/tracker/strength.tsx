@@ -1,7 +1,7 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
-  SafeAreaView, ScrollView,
+  SafeAreaView, ScrollView, Image,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -15,6 +15,7 @@ type ExerciseProgress = {
   id: string;
   name: string;
   inputType: InputType;
+  gifUrl?: string;
   sets: Array<{ set: number; reps: string; duration: string; status: SetStatus }>;
 };
 
@@ -35,6 +36,7 @@ export default function StrengthTracker() {
         id: e.id,
         name: e.name,
         inputType: (e.inputType ?? 'reps') as InputType,
+        gifUrl: e.gifUrl ?? null,
         sets: e.sets.map((s: any) => ({
           set: s.set,
           reps: s.reps ?? '10',
@@ -51,15 +53,17 @@ export default function StrengthTracker() {
   const [isTraining, setIsTraining] = useState(false);
   const [restCountdown, setRestCountdown] = useState(REST_DURATION);
   const [totalTime, setTotalTime] = useState(0);
+  const [countdown, setCountdown] = useState(0); // State baru untuk hitung mundur
   const [currentExerciseIndex, setCurrentExerciseIndex] = useState(0);
   const [currentSetIndex, setCurrentSetIndex] = useState(0);
   // State khusus set timer (untuk exercise inputType === 'duration')
-  const [setCountdown, setSetCountdown] = useState(0);
+  const [activeSetCountdown, setActiveSetCountdown] = useState(0);
   const [setTimerActive, setSetTimerActive] = useState(false);
 
   const totalTimerRef = useRef<any>(null);
   const restTimerRef = useRef<any>(null);
   const setTimerRef = useRef<any>(null);
+  const countdownTimerRef = useRef<any>(null); // Ref baru untuk timer hitung mundur
 
   // Refs untuk hindari stale closure di interval
   const exerciseIndexRef = useRef(0);
@@ -72,6 +76,78 @@ export default function StrengthTracker() {
   const currentExercise = progress[currentExerciseIndex];
   const currentSet = currentExercise?.sets[currentSetIndex];
 
+  // ── Actions ──────────────────────────────────────────────────────────────
+
+  // completeSetAuto dipanggil saat set timer habis otomatis
+  const completeSetAuto = useCallback(() => {
+    const exIdx = exerciseIndexRef.current;
+    const setIdx = setIndexRef.current;
+    const prog = progressRef.current;
+
+    const updated = prog.map((ex, ei) => {
+      if (ei !== exIdx) return ex;
+      return {
+        ...ex,
+        sets: ex.sets.map((s, si) => (si === setIdx ? { ...s, status: 'done' as SetStatus } : s)),
+      };
+    });
+    setProgress(updated);
+
+    const exercise = prog[exIdx];
+    const isLastSet = setIdx === exercise.sets.length - 1;
+    const isLastExercise = exIdx === prog.length - 1;
+
+    setIsTraining(false);
+    if (isLastSet && isLastExercise) {
+      setScreen('finished');
+      return;
+    }
+    setScreen('rest');
+  }, []);
+
+  // Logika sebenarnya untuk memulai set, dipanggil setelah hitung mundur selesai
+  const _startSetLogic = useCallback(() => {
+    setCountdown(0); // Pastikan hitung mundur direset
+    setIsTraining(true);
+    // Jika exercise pakai durasi → mulai countdown set timer
+    if (currentExercise.inputType === 'duration') {
+      const secs = parseInt(currentSet.duration ?? '30');
+      setActiveSetCountdown(secs);
+      setSetTimerActive(true);
+      setTimerRef.current = setInterval(() => {
+        setActiveSetCountdown((prev) => {
+          if (prev <= 1) {
+            clearInterval(setTimerRef.current);
+            setTimerRef.current = null;
+            setSetTimerActive(false);
+            // Auto complete saat waktu habis
+            completeSetAuto();
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+  }, [currentExercise, currentSet, completeSetAuto]);
+
+  // ── Countdown timer ──────────────────────────────────────────────────────
+  useEffect(() => {
+    if (countdown > 0) {
+      countdownTimerRef.current = setInterval(() => {
+        setCountdown((prev) => prev - 1);
+      }, 1000);
+    } else if (countdown === 0 && screen === 'exercise' && !isTraining) {
+      // Hitung mundur selesai, dan kita di layar exercise, dan belum training
+      // Ini saatnya untuk benar-benar memulai set.
+      _startSetLogic();
+    }
+
+    return () => {
+      clearInterval(countdownTimerRef.current);
+      countdownTimerRef.current = null;
+    };
+  }, [countdown, screen, isTraining, _startSetLogic]);
+
   // ── Auto-start duration timer setelah rest ─────────────────────────────
   // Saat isTraining=true tapi setTimerActive=false (baru masuk exercise screen),
   // dan exercise bertipe duration → langsung jalankan timer
@@ -83,10 +159,10 @@ export default function StrengthTracker() {
       currentExercise?.inputType === 'duration'
     ) {
       const secs = parseInt(currentSet?.duration ?? '30');
-      setSetCountdown(secs);
+      setActiveSetCountdown(secs);
       setSetTimerActive(true);
       setTimerRef.current = setInterval(() => {
-        setSetCountdown((prev) => {
+        setActiveSetCountdown((prev) => {
           if (prev <= 1) {
             clearInterval(setTimerRef.current);
             setTimerRef.current = null;
@@ -98,7 +174,7 @@ export default function StrengthTracker() {
         });
       }, 1000);
     }
-  }, [screen, isTraining]);
+  }, [screen, isTraining, currentExercise, currentSet, setTimerActive, completeSetAuto]);
 
   // ── Total timer ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -162,54 +238,9 @@ export default function StrengthTracker() {
   const totalSets = progress.reduce((acc, e) => acc + e.sets.length, 0);
   const doneSets = progress.reduce((acc, e) => acc + e.sets.filter((s) => s.status === 'done').length, 0);
 
-  // ── Actions ──────────────────────────────────────────────────────────────
-  const startWorkout = () => setScreen('exercise');
-
-  const startSet = () => {
-    setIsTraining(true);
-    // Jika exercise pakai durasi → mulai countdown set timer
-    if (currentExercise.inputType === 'duration') {
-      const secs = parseInt(currentSet.duration ?? '30');
-      setSetCountdown(secs);
-      setSetTimerActive(true);
-      setTimerRef.current = setInterval(() => {
-        setSetCountdown((prev) => {
-          if (prev <= 1) {
-            clearInterval(setTimerRef.current);
-            setTimerRef.current = null;
-            setSetTimerActive(false);
-            // Auto complete saat waktu habis
-            completeSetAuto();
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    }
-  };
-
-  // completeSetAuto dipanggil saat set timer habis otomatis
-  const completeSetAuto = () => {
-    const exIdx = exerciseIndexRef.current;
-    const setIdx = setIndexRef.current;
-    const prog = progressRef.current;
-
-    const updated = prog.map((ex, ei) => {
-      if (ei !== exIdx) return ex;
-      return {
-        ...ex,
-        sets: ex.sets.map((s, si) => si === setIdx ? { ...s, status: 'done' as SetStatus } : s),
-      };
-    });
-    setProgress(updated);
-
-    const exercise = prog[exIdx];
-    const isLastSet = setIdx === exercise.sets.length - 1;
-    const isLastExercise = exIdx === prog.length - 1;
-
-    setIsTraining(false);
-    if (isLastSet && isLastExercise) { setScreen('finished'); return; }
-    setScreen('rest');
+  const startSetCountdown = () => {
+    setCountdown(3); // Mulai hitung mundur 3 detik
+    setScreen('exercise'); // Pastikan kita di layar exercise
   };
 
   const completeSet = () => {
@@ -243,19 +274,18 @@ export default function StrengthTracker() {
     const isLastSet = setIdx === exercise.sets.length - 1;
     if (!isLastSet) { setCurrentSetIndex(setIdx + 1); }
     else { setCurrentExerciseIndex(exIdx + 1); setCurrentSetIndex(0); }
-    // Auto-start: langsung mulai set tanpa perlu pencet tombol
-    setIsTraining(true);
-    setScreen('exercise');
+    // Trigger hitung mundur sebelum memulai set berikutnya
+    startSetCountdown();
   };
 
   const goToNext = () => {
     const isLastSet = currentSetIndex === currentExercise.sets.length - 1;
     if (!isLastSet) { setCurrentSetIndex((p) => p + 1); }
     else { setCurrentExerciseIndex((p) => p + 1); setCurrentSetIndex(0); }
-    // Auto-start: langsung mulai set tanpa perlu pencet tombol
-    setIsTraining(true);
-    setScreen('exercise');
+    // Trigger hitung mundur sebelum memulai set berikutnya
+    startSetCountdown();
   };
+
 
   const skipRest = () => {
     clearInterval(restTimerRef.current);
@@ -268,21 +298,21 @@ export default function StrengthTracker() {
     setRestCountdown((prev) => prev + 15);
   };
 
-  const handleFinish = () => {
+  const handleFinish = async () => {
     clearInterval(totalTimerRef.current);
     clearInterval(restTimerRef.current);
     clearInterval(setTimerRef.current);
-    saveTrackingResult(dateKey, uid, {
+    await saveTrackingResult(dateKey, uid, {
       actualDistance: 0, actualDuration: totalTime, actualPace: '--', completedAt: Date.now(),
     });
     router.back();
   };
 
   const getUpNext = () => {
-    const isLastSet = currentSetIndex === currentExercise?.sets.length - 1;
-    if (!isLastSet) return { name: currentExercise?.name, label: `Set ${currentSetIndex + 2} / ${currentExercise?.sets.length}` };
-    const nextEx = progress[currentExerciseIndex + 1];
-    return nextEx ? { name: nextEx.name, label: 'Set 1' } : null;
+    const isLastSet = currentSetIndex === (currentExercise?.sets.length ?? 0) - 1;
+    if (!isLastSet) return { name: currentExercise?.name, label: `Set ${currentSetIndex + 2} / ${currentExercise?.sets.length}`, gifUrl: currentExercise?.gifUrl };
+    const nextEx = progress[currentExerciseIndex + 1]; // Ambil exercise berikutnya
+    return nextEx ? { name: nextEx.name, label: 'Set 1', gifUrl: nextEx.gifUrl } : null;
   };
   const upNext = getUpNext();
 
@@ -306,7 +336,13 @@ export default function StrengthTracker() {
           </View>
           {progress.map((exercise) => (
             <View key={exercise.id} style={s.previewCard}>
-              <View style={s.previewThumb}><Ionicons name="barbell-outline" size={22} color="#CCC" /></View>
+              <View style={s.previewThumb}>
+                {exercise.gifUrl ? (
+                  <Image source={{ uri: exercise.gifUrl }} style={s.previewGif} resizeMode="cover" />
+                ) : (
+                  <Ionicons name="barbell-outline" size={22} color="#CCC" />
+                )}
+              </View>
               <View style={{ flex: 1 }}>
                 <Text style={s.previewCardTitle}>{exercise.name}</Text>
                 <Text style={s.previewCardSub}>
@@ -326,7 +362,7 @@ export default function StrengthTracker() {
             </View>
           ))}
           <Text style={s.previewQuote}>"Istirahat juga bagian dari progres"</Text>
-          <TouchableOpacity style={s.startBtn} onPress={startWorkout} activeOpacity={0.88}>
+          <TouchableOpacity style={s.startBtn} onPress={startSetCountdown} activeOpacity={0.88}>
             <Text style={s.startBtnText}>Start Workout</Text>
           </TouchableOpacity>
         </ScrollView>
@@ -344,6 +380,11 @@ export default function StrengthTracker() {
     return (
       <SafeAreaView style={s.safe}>
         <View style={s.exScreen}>
+          {countdown > 0 && (
+            <View style={s.countdownOverlay}>
+              <Text style={s.countdownText}>{countdown}</Text>
+            </View>
+          )}
           {/* Progress bar */}
           <View style={s.progressBarWrap}>
             <View style={[s.progressBarFill, { width: `${(doneSets / totalSets) * 100}%` as any }]} />
@@ -353,10 +394,18 @@ export default function StrengthTracker() {
           <Text style={s.exCurrentLabel}>CURRENT EXERCISE</Text>
           <Text style={s.exTitle}>{currentExercise.name}</Text>
 
-          {/* Video / placeholder */}
-          <View style={s.videoPlaceholder}>
-            <Ionicons name="barbell-outline" size={48} color="#555" />
-          </View>
+          {/* GIF / placeholder */}
+          {currentExercise.gifUrl ? (
+            <Image
+              source={{ uri: currentExercise.gifUrl }}
+              style={s.videoPlaceholder}
+              resizeMode="contain"
+            />
+          ) : (
+            <View style={s.videoPlaceholder}>
+              <Ionicons name="barbell-outline" size={48} color="#555" />
+            </View>
+          )}
 
           {/* Stat cards — sesuai referensi */}
           <View style={s.exStatsRow}>
@@ -374,14 +423,14 @@ export default function StrengthTracker() {
               {isDuration ? (
                 <View style={s.exSetRow}>
                   <Text style={[s.exSetNum, setTimerActive && { color: '#FF6B35' }]}>
-                    {setTimerActive ? setCountdown : targetValue}
+                    {setTimerActive ? activeSetCountdown : targetValue}
                   </Text>
-                  <Text style={s.exSetWord}>{''}Detik</Text>
+                  <Text style={s.exSetWord}>{' '}Detik</Text>
                 </View>
               ) : (
                 <View style={s.exSetRow}>
                   <Text style={s.exSetNum}>{currentSet.reps}</Text>
-                  <Text style={s.exSetWord}>{''}Reps</Text>
+                  <Text style={s.exSetWord}>{' '}Reps</Text>
                 </View>
               )}
             </View>
@@ -390,8 +439,9 @@ export default function StrengthTracker() {
           {/* Tombol bawah: START SET (atas) + SKIP SET (bawah) */}
           <View style={s.exBtnGroup}>
             <TouchableOpacity
-              style={[s.ctaBtn, isTraining && s.ctaBtnActive]}
-              onPress={isTraining ? completeSet : startSet}
+              style={[s.ctaBtn, (isTraining || countdown > 0) && s.ctaBtnActive]}
+              onPress={isTraining ? completeSet : startSetCountdown}
+              disabled={countdown > 0} // Disable tombol saat hitung mundur aktif
               activeOpacity={0.88}
             >
               <Ionicons
@@ -399,8 +449,8 @@ export default function StrengthTracker() {
                 size={20} color="#111"
               />
               <Text style={s.ctaBtnText}>
-                {isTraining
-                  ? (isDuration ? `SELESAI (${setCountdown} dtk)` : 'COMPLETE SET')
+                {countdown > 0 ? `STARTING... (${countdown})` : isTraining
+                  ? (isDuration ? `SELESAI (${activeSetCountdown} dtk)` : 'COMPLETE SET')
                   : (isDuration ? 'MULAI TIMER' : 'START SET')}
               </Text>
             </TouchableOpacity>
@@ -421,22 +471,53 @@ export default function StrengthTracker() {
     return (
       <SafeAreaView style={s.safe}>
         <ScrollView contentContainerStyle={s.restScroll} showsVerticalScrollIndicator={false}>
-          <View style={s.restTopRow}>
-            <Text style={s.restTopTimer}>{formatTime(totalTime)}</Text>
-            <Text style={s.restTopLabel}>waktu berjalan</Text>
-          </View>
-          <Text style={s.restHeading}>Rest Time</Text>
+        <View style={s.restHeader}>
+  <View style={s.restBadge}>
+    <Text style={s.restBadgeText}>FASE ISTIRAHAT</Text>
+  </View>
+
+  <Text style={s.restTitle}>
+    Waktunya Istirahat
+  </Text>
+
+  <Text style={s.restSubtitle}>
+    Istirahat juga bagian dari progres
+  </Text>
+</View>
           <View style={s.restCircle}>
             <Text style={s.restCountdownText}>{formatCountdown(restCountdown)}</Text>
             <Text style={s.restCountdownSub}>detik tersisa</Text>
           </View>
           {upNext && (
-            <View style={s.upNextCard}>
-              <Text style={s.upNextLabel}>SELANJUTNYA</Text>
-              <Text style={s.upNextTitle}>{upNext.name}</Text>
-              <Text style={s.upNextSub}>{upNext.label}</Text>
-            </View>
-          )}
+  <View style={s.upNextCard}>
+    {upNext.gifUrl ? (
+      <Image
+        source={{ uri: upNext.gifUrl }}
+        style={s.upNextPreview}
+        resizeMode="cover"
+      />
+    ) : (
+      <View style={s.upNextPreviewPlaceholder}>
+        <Ionicons name="barbell-outline" size={40} color="#666" />
+      </View>
+    )}
+
+    <View style={s.upNextInfo}>
+      <Text style={s.upNextLabel}>UP NEXT</Text>
+
+      <Text style={s.upNextTitle}>
+        {upNext.name}
+      </Text>
+
+      <View style={s.upNextMeta}>
+        <Ionicons name="time-outline" size={14} color="#666" />
+        <Text style={s.upNextMetaText}>
+          {upNext.label}
+        </Text>
+      </View>
+    </View>
+  </View>
+)}
           {/* Dua tombol: +15 SEC dan SKIP REST */}
           <View style={s.restBtnRow}>
             <TouchableOpacity style={s.addTimeBtn} onPress={addRestTime} activeOpacity={0.88}>
@@ -461,13 +542,13 @@ export default function StrengthTracker() {
         {/* Icon dengan centang hijau — sesuai referensi */}
         <View style={s.finishedIconWrap}>
           <View style={s.finishedIconCircle}>
-            <Ionicons name="barbell" size={40} color="#6BFF8F" />
+            <Ionicons name="barbell" size={40} color="#fff" />
           </View>
           <View style={s.finishedCheckBadge}>
-            <Ionicons name="checkmark-circle" size={24} color="#6BFF8F"/>
+            <Ionicons name="checkmark-circle" size={24} color="#5BFF7A" />
           </View>
         </View>
-        <Text style={s.finishedTitle}>Workout{''}Selesai!</Text>
+        <Text style={s.finishedTitle}>Workout{' '}Selesai!</Text>
         <Text style={s.finishedSub}>Pelan tidak apa-apa, yang penting konsisten</Text>
         <View style={s.durationCard}>
           <Text style={s.durationLabel}>DURASI TOTAL</Text>
@@ -500,7 +581,8 @@ const s = StyleSheet.create({
   statLabel: { fontSize: 10, fontWeight: '700', color: '#AAA', letterSpacing: 0.5 },
   statValue: { fontSize: 15, fontWeight: '800', color: '#111' },
   previewCard: { backgroundColor: '#FFF', borderRadius: 18, padding: 14, flexDirection: 'row', gap: 12, alignItems: 'center' },
-  previewThumb: { width: 56, height: 56, borderRadius: 14, backgroundColor: '#F4F4F4', alignItems: 'center', justifyContent: 'center' },
+  previewThumb: { width: 56, height: 56, borderRadius: 14, backgroundColor: '#F4F4F4', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  previewGif: { width: 56, height: 56, borderRadius: 14 },
   previewCardTitle: { fontSize: 16, fontWeight: '700', color: '#111' },
   previewCardSub: { fontSize: 13, color: '#888', marginTop: 4 },
   typeBadge: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#FFF1EC', borderRadius: 20, paddingHorizontal: 8, paddingVertical: 4 },
@@ -515,7 +597,7 @@ const s = StyleSheet.create({
   progressBarFill: { height: '100%', backgroundColor: '#5BFF7A', borderRadius: 3 },
   exCurrentLabel: { fontSize: 11, fontWeight: '700', color: '#999', letterSpacing: 0.8 },
   exTitle: { fontSize: 28, fontWeight: '800', color: '#111', marginTop: -4 },
-  videoPlaceholder: { flex: 1, minHeight: 180, backgroundColor: '#333', borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  videoPlaceholder: { flex: 1, },
   exStatsRow: { flexDirection: 'row', gap: 12 },
   exStatCard: { flex: 1, backgroundColor: '#FFF', borderRadius: 18, padding: 16, gap: 6 },
   exStatLabel: { fontSize: 10, fontWeight: '700', color: '#888', letterSpacing: 0.5 },
@@ -535,14 +617,94 @@ const s = StyleSheet.create({
   restTopRow: { alignItems: 'center', gap: 2 },
   restTopTimer: { fontSize: 28, fontWeight: '800', color: '#111' },
   restTopLabel: { fontSize: 12, color: '#888' },
+  restHeader: {
+  alignItems: 'center',
+  marginTop: 0,
+  marginBottom: 0,
+},
+
+restBadge: {
+  backgroundColor: '#67F28A',
+  paddingHorizontal: 14,
+  paddingVertical: 6,
+  borderRadius: 999,
+  marginBottom: 1,
+},
+
+restBadgeText: {
+  fontSize: 10,
+  fontWeight: '700',
+  color: '#1A4D2E',
+  letterSpacing: 1,
+},
+
+restTitle: {
+  fontSize: 26,
+  fontWeight: '900',
+  color: '#111',
+  textAlign: 'center',
+},
+
+restSubtitle: {
+  marginTop: 2,
+  fontSize: 16,
+  color: '#666',
+  textAlign: 'center',
+},
   restHeading: { fontSize: 22, fontWeight: '800', color: '#111' },
   restCircle: { width: 220, height: 220, borderRadius: 110, borderWidth: 8, borderColor: '#5BFF7A', backgroundColor: '#FFF', alignItems: 'center', justifyContent: 'center', gap: 4 },
   restCountdownText: { fontSize: 54, fontWeight: '800', color: '#111' },
   restCountdownSub: { fontSize: 13, color: '#888', fontWeight: '500' },
-  upNextCard: { width: '100%', backgroundColor: '#FFF', borderRadius: 22, padding: 20, gap: 4 },
-  upNextLabel: { fontSize: 11, fontWeight: '700', color: '#2EAF62', letterSpacing: 0.5 },
-  upNextTitle: { fontSize: 22, fontWeight: '800', color: '#111' },
-  upNextSub: { fontSize: 13, color: '#888', fontWeight: '500' },
+  upNextCard: {
+  width: '100%',
+  backgroundColor: '#FFF',
+  borderRadius: 18,
+  overflow: 'hidden',
+},
+
+upNextPreview: {
+  width: '100%',
+  height: 180,
+  backgroundColor: '#EEE',
+},
+
+upNextPreviewPlaceholder: {
+  width: '100%',
+  height: 180,
+  backgroundColor: '#2F2F38',
+  alignItems: 'center',
+  justifyContent: 'center',
+},
+
+upNextInfo: {
+  padding: 16,
+},
+
+upNextLabel: {
+  fontSize: 10,
+  fontWeight: '700',
+  color: '#5BFF7A',
+  letterSpacing: 1,
+  marginBottom: 6,
+},
+
+upNextTitle: {
+  fontSize: 22,
+  fontWeight: '800',
+  color: '#111',
+  marginBottom: 8,
+},
+
+upNextMeta: {
+  flexDirection: 'row',
+  alignItems: 'center',
+},
+
+upNextMetaText: {
+  marginLeft: 4,
+  fontSize: 13,
+  color: '#666',
+},
   skipBtn: { flex: 1, backgroundColor: '#5BFF7A', borderRadius: 40, paddingVertical: 18, alignItems: 'center' },
   skipBtnText: { fontWeight: '800', color: '#111', fontSize: 14 },
   restBtnRow: { flexDirection: 'row', gap: 10, width: '100%' },
@@ -552,7 +714,7 @@ const s = StyleSheet.create({
   finishedScreen: { flex: 1, padding: 24, justifyContent: 'center', alignItems: 'center', gap: 4 },
   finishedIconWrap: { position: 'relative', marginBottom: 4 },
   finishedIconCircle: { width: 100, height: 100, borderRadius: 50, backgroundColor: '#111', alignItems: 'center', justifyContent: 'center' },
-  finishedCheckBadge: { position: 'absolute', bottom: -4, right: -4, backgroundColor: '#111', borderRadius: 14, padding: 1 },
+  finishedCheckBadge: { position: 'absolute', bottom: -4, right: -4, backgroundColor: '#fff', borderRadius: 14, padding: 1 },
   trophyWrap: { width: 88, height: 88, borderRadius: 44, backgroundColor: '#111', alignItems: 'center', justifyContent: 'center' },
   finishedTitle: { fontSize: 36, fontWeight: '800', color: '#111', marginTop: 20, textAlign: 'center', lineHeight: 44 },
   finishedSub: { fontSize: 14, color: '#777', textAlign: 'center', lineHeight: 22 },
@@ -565,4 +727,17 @@ const s = StyleSheet.create({
   finStatValue: { fontSize: 26, fontWeight: '800', color: '#111' },
   finishBtn: { width: '100%', backgroundColor: '#5BFF7A', paddingVertical: 18, borderRadius: 40, marginTop: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   finishBtnText: { fontSize: 16, fontWeight: '800', color: '#111' },
+  // Countdown Overlay
+  countdownOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.8)', // Ubah kegelapan background di sini
+    zIndex: 100,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  countdownText: { fontSize: 120, fontWeight: '900', color: '#6BFF8F' }, // Ubah ukuran atau warna angka di sini
 });

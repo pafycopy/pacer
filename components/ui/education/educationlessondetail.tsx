@@ -10,19 +10,100 @@ import {
   ExerciseCategory, Exercise,
 } from '@/constants/strengthdata';
 
-// ─── Muscle tag colors ────────────────────────────────────────────────────────
-const MUSCLE_COLORS: Record<string, { bg: string; text: string }> = {
-  'Otot Glutes': { bg: '#FFF3E0', text: '#E65100' },
-  'Quadrisep':   { bg: '#E8F5E9', text: '#2E7D32' },
-  'Hamstring':   { bg: '#F3E5F5', text: '#6A1B9A' },
-  'Betis':       { bg: '#E0F7FA', text: '#00695C' },
-  'Glutes':      { bg: '#FFF3E0', text: '#E65100' },
-  'Core':        { bg: '#E3F2FD', text: '#1565C0' },
-  'Bahu':        { bg: '#FCE4EC', text: '#AD1457' },
-  'Punggung':    { bg: '#FFF8E1', text: '#F57F17' },
+// ─── Config per kategori ──────────────────────────────────────────────────────
+const CATEGORY_META: Record<ExerciseCategory, {
+  accentColor: string;
+  dotColor: string;
+  level: string;
+  freq: string;
+  benefits: string[];
+}> = {
+  Strength: {
+    accentColor: '#FF6B35',
+    dotColor: '#4CD964',
+    level: 'Pemula',
+    freq: '2-3x per week',
+    benefits: [
+      'Meningkatkan stabilitas lutut',
+      'Membantu efisiensi langkah kaki',
+      'Membangun kekuatan dasar kaki',
+    ],
+  },
+  Core: {
+    accentColor: '#4CD964',
+    dotColor: '#4CD964',
+    level: 'Pemula',
+    freq: '3-4x per week',
+    benefits: [
+      'Menjaga postur tubuh saat berlari',
+      'Mencegah cedera punggung bawah',
+      'Meningkatkan keseimbangan tubuh',
+    ],
+  },
+  Mobility: {
+    accentColor: '#007AFF',
+    dotColor: '#007AFF',
+    level: 'Semua Level',
+    freq: 'Setiap hari',
+    benefits: [
+      'Meningkatkan rentang gerak sendi',
+      'Mengurangi kekakuan otot',
+      'Mencegah cedera saat berlari',
+    ],
+  },
+  Recovery: {
+    accentColor: '#9C27B0',
+    dotColor: '#9C27B0',
+    level: 'Semua Level',
+    freq: 'Setelah latihan',
+    benefits: [
+      'Mempercepat pemulihan otot',
+      'Mengurangi kekakuan pasca lari',
+      'Merelaksasi otot yang tegang',
+    ],
+  },
 };
-const getMuscleStyle = (m: string) =>
-  MUSCLE_COLORS[m] ?? { bg: '#F0F0F0', text: '#555' };
+
+// ─── Meta per group (tab) — override card saat tab dipilih ──────────────────
+const GROUP_META: Record<string, {
+  title: string;
+  level: string;
+  dotColor: string;
+  freq: string;
+  benefits: string[];
+}> = {
+  'Lower Body': {
+    title: 'Otot Kaki & Inti',
+    level: 'Pemula',
+    dotColor: '#4CD964',
+    freq: '2-3x per week',
+    benefits: [
+      'Meningkatkan stabilitas lutut',
+      'Membantu efisiensi langkah kaki',
+      'Membangun kekuatan dasar kaki',
+    ],
+  },
+  'Balance': {
+    title: 'Otot Kaki & Inti',
+    level: 'Pemula',
+    dotColor: '#4CD964',
+    freq: '1-2x per week',
+    benefits: [
+      'Tingkatkan stabilitas & kendali',
+    ],
+  },
+  'Plyometric': {
+    title: 'Otot Kaki & Inti',
+    level: 'Menengah',
+    dotColor: '#FCD53F',
+    freq: '1-2x per week',
+    benefits: [
+      'Melatih respon dan kecepatan kaki',
+      'Meningkatkan effesiensi langkah lari',
+      'Mengembangkan elastisitas otot',
+    ],
+  },
+};
 
 // ─── Exercise Detail Modal ────────────────────────────────────────────────────
 function ExerciseDetailModal({
@@ -33,8 +114,6 @@ function ExerciseDetailModal({
   return (
     <Modal visible animationType="slide" presentationStyle="fullScreen">
       <SafeAreaView style={d.safe}>
-
-        {/* Header — hanya tombol back */}
         <View style={d.header}>
           <TouchableOpacity onPress={onClose} style={d.backBtn}>
             <Ionicons name="arrow-back" size={22} color="#111" />
@@ -43,24 +122,16 @@ function ExerciseDetailModal({
         </View>
 
         <ScrollView contentContainerStyle={d.content} showsVerticalScrollIndicator={false}>
-
-          {/* ── 1. JUDUL ── */}
           <Text style={d.exerciseName}>{exercise.name}</Text>
 
-          {/* ── 2. GIF / IMAGE ── */}
           {exercise.gifUrl ? (
-            <Image
-              source={{ uri: exercise.gifUrl }}
-              style={d.mediaImage}
-              resizeMode="cover"
-            />
+            <Image source={{ uri: exercise.gifUrl }} style={d.mediaImage} resizeMode="cover" />
           ) : (
             <View style={d.mediaBox}>
               <Ionicons name="image-outline" size={40} color="#BBB" />
             </View>
           )}
 
-          {/* ── 3. DESKRIPSI — dalam card ── */}
           {exercise.description ? (
             <View style={d.card}>
               <Text style={d.description}>
@@ -70,7 +141,6 @@ function ExerciseDetailModal({
             </View>
           ) : null}
 
-          {/* ── 4. AREA FOKUS — dalam card ── */}
           {exercise.muscles && exercise.muscles.length > 0 && (
             <View style={d.card}>
               <View style={d.sectionLabelRow}>
@@ -87,9 +157,6 @@ function ExerciseDetailModal({
             </View>
           )}
 
-          <View style={d.divider} />
-
-          {/* ── 5. MANFAAT BAGI PELARI ── */}
           {exercise.benefits && exercise.benefits.length > 0 && (
             <View style={d.section}>
               <Text style={d.sectionLabel}>MANFAAT BAGI PELARI</Text>
@@ -101,7 +168,6 @@ function ExerciseDetailModal({
               ))}
             </View>
           )}
-
         </ScrollView>
       </SafeAreaView>
     </Modal>
@@ -112,56 +178,70 @@ function ExerciseDetailModal({
 import { EducationLesson, EducationTopic } from '@/constants/educationdata';
 
 type Props = {
-  // Mode strength: pakai category
   category?: ExerciseCategory;
-  title?: string;           // ← optional, fallback ke lesson.title
+  title?: string;
   subtitle?: string;
-  // Mode injury: pakai lesson + topic
   lesson?: EducationLesson;
   topic?: EducationTopic;
   onBack: () => void;
 };
 
-export default function EducationLessonDetail({ category, title, subtitle, lesson, topic, onBack }: Props) {
-  // Resolve title dari props atau dari lesson
-  const resolvedTitle = title ?? lesson?.title ?? '';
+export default function EducationLessonDetail({ category, title, onBack }: Props) {
   const [activeTab, setActiveTab] = useState<string | null>(null);
   const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(null);
 
   const allExercises = category ? EXERCISES.filter((e) => e.category === category) : [];
+  // Ambil meta group yang sedang aktif (saat tab dipilih)
+  const activeGroupMeta = activeTab ? GROUP_META[activeTab] ?? null : null;
   const groups = Array.from(new Set(allExercises.map((e) => e.group).filter(Boolean))) as string[];
   const filtered = activeTab ? allExercises.filter((e) => e.group === activeTab) : allExercises;
 
-  const FOCUS: Record<ExerciseCategory, string[]> = {
-    Strength: ['Kekuatan kaki', 'Stabilitas', 'Power untuk lari'],
-    Core:     ['Stabilitas postur', 'Keseimbangan tubuh', 'Mencegah cedera punggung'],
-    Mobility: ['Rentang gerak', 'Fleksibilitas sendi', 'Kelancaran stride'],
-    Recovery: ['Pemulihan otot', 'Mengurangi kekakuan', 'Relaksasi pasca lari'],
-  };
-  const focusItems = category ? FOCUS[category] : [];
+  const meta = category ? CATEGORY_META[category] : null;
+  const cfg  = category ? CATEGORY_CONFIG[category] : null;
 
   return (
     <SafeAreaView style={s.safe}>
+      {/* Header */}
       <View style={s.header}>
         <TouchableOpacity onPress={onBack} style={s.backBtn}>
           <Ionicons name="arrow-back" size={22} color="#111" />
         </TouchableOpacity>
-        <Text style={s.headerTitle}>{title}</Text>
         <View style={{ width: 36 }} />
       </View>
 
       <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
 
-        <View style={s.focusCard}>
-          <Text style={s.focusTitle}>Fokus Inti</Text>
-          {focusItems.map((item, i) => (
-            <View key={i} style={s.focusItem}>
-              <Text style={s.focusBullet}>–</Text>
-              <Text style={s.focusText}>{item}</Text>
-            </View>
-          ))}
-        </View>
+        {/* ── Hero Card — putih, teks gelap, dekorasi hijau muda ── */}
+        {meta && cfg && (
+          <View style={s.heroCard}>
+            {/* Dekorasi lingkaran sudut kanan atas */}
+            <View style={[s.decoCircle1, { backgroundColor: meta.dotColor + '22' }]} pointerEvents="none" />
+            <View style={[s.decoCircle2, { backgroundColor: meta.dotColor + '15' }]} pointerEvents="none" />
 
+            {/* Nama kategori — berubah sesuai tab aktif */}
+            <Text style={s.heroTitle}>{activeGroupMeta?.title ?? title ?? cfg.desc}</Text>
+
+            {/* Badge level & frekuensi */}
+            <View style={s.heroBadgeRow}>
+              <View style={s.heroBadgeLevel}>
+                <View style={[s.heroBadgeDot, { backgroundColor: activeGroupMeta?.dotColor ?? meta.dotColor }]} />
+                <Text style={s.heroBadgeLevelText}>{activeGroupMeta?.level ?? meta.level}</Text>
+              </View>
+              <View style={s.heroBadgeFreq}>
+                <Text style={s.heroBadgeFreqText}>{activeGroupMeta?.freq ?? meta.freq}</Text>
+              </View>
+            </View>
+
+            {/* List manfaat — berubah sesuai tab aktif */}
+            <View style={s.heroBenefits}>
+              {(activeGroupMeta?.benefits ?? meta.benefits).map((b, i) => (
+                <Text key={i} style={s.heroBenefitText}>{b}</Text>
+              ))}
+            </View>
+          </View>
+        )}
+
+        {/* ── Tab filter group ── */}
         {groups.length > 0 && (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.tabScroll}>
             <View style={s.tabRow}>
@@ -170,11 +250,11 @@ export default function EducationLessonDetail({ category, title, subtitle, lesso
                 return (
                   <TouchableOpacity
                     key={group}
-                    style={[s.tabBtn, active && { backgroundColor: '#111' }]}
+                    style={[s.tabBtn, active && s.tabBtnActive]}
                     onPress={() => setActiveTab(active ? null : group)}
                     activeOpacity={0.8}
                   >
-                    <Text style={[s.tabText, active && { color: '#FFF' }]}>{group}</Text>
+                    <Text style={[s.tabText, active && s.tabTextActive]}>{group}</Text>
                   </TouchableOpacity>
                 );
               })}
@@ -182,6 +262,7 @@ export default function EducationLessonDetail({ category, title, subtitle, lesso
           </ScrollView>
         )}
 
+        {/* ── List exercise ── */}
         {filtered.map((exercise) => (
           <TouchableOpacity
             key={exercise.id}
@@ -190,27 +271,11 @@ export default function EducationLessonDetail({ category, title, subtitle, lesso
             activeOpacity={0.75}
           >
             <View style={s.exerciseLeft}>
-              <View style={[s.typeIcon, {
-                backgroundColor: exercise.inputType === 'duration' ? '#EEF4FF' : '#FFF1EC',
-              }]}>
-                <Ionicons
-                  name={exercise.inputType === 'duration' ? 'timer-outline' : 'repeat-outline'}
-                  size={16}
-                  color={exercise.inputType === 'duration' ? '#007AFF' : '#FF6B35'}
-                />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={s.exerciseName}>{exercise.name}</Text>
-                <Text style={s.exerciseTarget}>
-                  {exercise.muscles
-                    ? `Target: ${exercise.muscles.slice(0, 2).join(', ')}`
-                    : exercise.category}
-                </Text>
-              </View>
+              <Text style={s.exerciseName}>{exercise.name}</Text>
             </View>
             <View style={s.viewDetailBtn}>
-              <Text style={s.viewDetailText}>View Detail</Text>
-              <Ionicons name="chevron-forward" size={16} color="#111" />
+              <Text style={s.viewDetailText}>Lihat Detail</Text>
+              <Ionicons name="chevron-forward" size={14} color="#888" />
             </View>
           </TouchableOpacity>
         ))}
@@ -237,118 +302,93 @@ const d = StyleSheet.create({
     backgroundColor: '#F0F0F0', alignItems: 'center', justifyContent: 'center',
   },
   content: { paddingHorizontal: 20, paddingBottom: 48, gap: 20 },
-
-  // 1. Judul — center, besar
-  exerciseName: {
-    fontSize: 34, fontWeight: '900', color: '#111', textAlign: 'center',
-  },
-
-  // 2. Media — rounded, tidak ada teks hint
+  exerciseName: { fontSize: 34, fontWeight: '900', color: '#111', textAlign: 'center' },
   mediaBox: {
     height: 200, borderRadius: 16, backgroundColor: '#F0F0F0',
     alignItems: 'center', justifyContent: 'center',
-    overflow: 'hidden',
   },
-  mediaImage: {
-    width: '100%', height: 200, borderRadius: 16,
-  },
-
-  // Card wrapper
+  mediaImage: { width: '100%', height: 200, borderRadius: 16 },
   card: {
-    backgroundColor: '#FFF',
-    borderRadius: 20,
-    padding: 20,
-    gap: 16,
-    shadowColor: '#000',
-    shadowOpacity: 0.06,
-    shadowRadius: 10,
-    elevation: 2,
+    backgroundColor: '#FFF', borderRadius: 20, padding: 20, gap: 16,
+    shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 10, elevation: 2,
   },
-
-  // 3. Deskripsi — center, nama bold
-  description: {
-    fontSize: 15, lineHeight: 24, color: '#444', textAlign: 'center',
-  },
+  description: { fontSize: 15, lineHeight: 24, color: '#444', textAlign: 'center' },
   descBold: { fontWeight: '700', color: '#111' },
-
-  // Divider
-  divider: { height: 1, backgroundColor: '#F0F0F0' },
-
-  // 4 & 5. Section
   section: { gap: 14, alignItems: 'center' },
-  sectionLabelRow: {
-    flexDirection: 'row', alignItems: 'center',
-    justifyContent: 'center', gap: 6,
-  },
-  sectionLabel: {
-    fontSize: 12, fontWeight: '800', color: '#888',
-    letterSpacing: 1, textAlign: 'center',
-  },
-
-  // Area fokus — outline tags, center
-  tagWrap: {
-    flexDirection: 'row', flexWrap: 'wrap',
-    gap: 8, justifyContent: 'center',
-  },
-  tag: {
-    borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8,
-    borderWidth: 1.5, borderColor: '#E0E0E0', backgroundColor: '#FFF',
-  },
+  sectionLabelRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  sectionLabel: { fontSize: 12, fontWeight: '800', color: '#888', letterSpacing: 1, textAlign: 'center' },
+  tagWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center' },
+  tag: { borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8, borderWidth: 1.5, borderColor: '#E0E0E0' },
   tagText: { fontSize: 13, fontWeight: '600', color: '#333' },
-
-  // Manfaat — list dengan centang, kiri
-  benefitRow: {
-  flexDirection: 'row',
-  alignItems: 'flex-start',
-  gap: 10,
-  width: '100%',
-  paddingHorizontal: 30,
-},
-
-benefitText: {
-  flex: 1,
-  fontSize: 15,
-  color: '#333',
-  fontWeight: '500',
-  lineHeight: 22,
-  textAlign: 'justify',
-},
+  benefitRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, width: '100%', paddingHorizontal: 30 },
+  benefitText: { flex: 1, fontSize: 15, color: '#333', fontWeight: '500', lineHeight: 22 },
+  divider: { height: 1, backgroundColor: '#F0F0F0' },
 });
 
 // ─── Styles — List Screen ─────────────────────────────────────────────────────
 const s = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#FAFAFA' },
+  safe: { flex: 1, backgroundColor: '#F5F5F5' },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingVertical: 12,
-    borderBottomWidth: 1, borderBottomColor: '#F0F0F0', backgroundColor: '#FAFAFA',
+    paddingHorizontal: 16, paddingVertical: 12, backgroundColor: '#F5F5F5',
   },
   backBtn: {
     width: 36, height: 36, borderRadius: 18,
-    backgroundColor: '#F0F0F0', alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#E8E8E8', alignItems: 'center', justifyContent: 'center',
   },
-  headerTitle: { flex: 1, textAlign: 'center', fontSize: 15, fontWeight: '700', color: '#111' },
-  content: { padding: 20, paddingBottom: 40 },
-  focusCard: { backgroundColor: '#FFF', borderRadius: 20, padding: 20, marginBottom: 20, gap: 6 },
-  focusTitle: { fontSize: 18, fontWeight: '800', color: '#111', marginBottom: 8 },
-  focusItem: { flexDirection: 'row', gap: 8 },
-  focusBullet: { fontSize: 14, color: '#888' },
-  focusText: { fontSize: 14, lineHeight: 22, color: '#444' },
-  tabScroll: { marginBottom: 16 },
-  tabRow: { flexDirection: 'row', gap: 8, paddingRight: 20 },
+  content: { paddingHorizontal: 16, paddingBottom: 40, gap: 12 },
+
+  // Hero card — putih, light style
+  heroCard: {
+    borderRadius: 20, padding: 24, overflow: 'hidden',
+    backgroundColor: '#FFFFFF', marginBottom: 4, gap: 14,
+    shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 8, elevation: 2,
+  },
+  decoCircle1: {
+    position: 'absolute', width: 160, height: 160, borderRadius: 80,
+    top: -40, right: -30,
+  },
+  decoCircle2: {
+    position: 'absolute', width: 100, height: 100, borderRadius: 50,
+    top: 30, right: 80,
+  },
+  heroTitle: { fontSize: 22, fontWeight: '800', color: '#111', lineHeight: 30 },
+  heroBadgeRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
+  heroBadgeLevel: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20,
+    backgroundColor: '#F0F0F0',
+  },
+  heroBadgeDot: { width: 8, height: 8, borderRadius: 4 },
+  heroBadgeLevelText: { fontSize: 13, fontWeight: '600', color: '#111' },
+  heroBadgeFreq: {
+    paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20,
+    borderWidth: 1.5, borderColor: '#E0E0E0', backgroundColor: '#fff',
+  },
+  heroBadgeFreqText: { fontSize: 13, fontWeight: '600', color: '#333' },
+  heroBenefits: { gap: 10, marginTop: 2 },
+  heroBenefitText: { fontSize: 14, color: '#555', lineHeight: 22 },
+
+  // Tab
+  tabScroll: { marginBottom: 4 },
+  tabRow: { flexDirection: 'row', gap: 8, paddingRight: 16 },
   tabBtn: {
-    paddingHorizontal: 16, paddingVertical: 8,
-    borderRadius: 999, backgroundColor: '#F0F0F0',
+    paddingHorizontal: 18, paddingVertical: 9,
+    borderRadius: 999, backgroundColor: '#FFFFFF',
+    borderWidth: 1, borderColor: '#E0E0E0',
   },
-  tabText: { fontSize: 12, fontWeight: '700', color: '#555' },
+  tabBtnActive: { backgroundColor: '#111', borderColor: '#111' },
+  tabText: { fontSize: 13, fontWeight: '600', color: '#555' },
+  tabTextActive: { color: '#FFF' },
+
+  // Exercise row — simple sesuai referensi
   exerciseRow: {
-    backgroundColor: '#FFF', borderRadius: 16, padding: 16, marginBottom: 10,
+    backgroundColor: '#FFF', borderRadius: 16,
+    paddingVertical: 18, paddingHorizontal: 20,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
   },
-  exerciseLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
-  typeIcon: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  exerciseName: { fontSize: 15, fontWeight: '700', color: '#111' },
-  exerciseTarget: { fontSize: 12, color: '#888', marginTop: 2 },
+  exerciseLeft: { flex: 1 },
+  exerciseName: { fontSize: 16, fontWeight: '700', color: '#111' },
   viewDetailBtn: { flexDirection: 'row', alignItems: 'center', gap: 2 },
-  viewDetailText: { fontSize: 13, fontWeight: '600', color: '#111' },
+  viewDetailText: { fontSize: 13, fontWeight: '500', color: '#888' },
 });

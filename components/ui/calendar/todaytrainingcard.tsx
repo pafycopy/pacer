@@ -55,6 +55,7 @@ type TodayWorkoutCardProps = {
   onStartPress?: () => void;
   onEdit?: () => void;
   onDelete?: () => void;
+  startDisabled?: boolean;
   isEmpty?: boolean;
 };
 
@@ -167,6 +168,7 @@ export default function TodayWorkoutCard({
   onStartPress,
   onEdit,
   onDelete,
+  startDisabled = false,
   isEmpty = false,
 }: TodayWorkoutCardProps) {
   const [menuVisible, setMenuVisible] = useState(false);
@@ -370,7 +372,12 @@ export default function TodayWorkoutCard({
             <Text style={styles.missedBtnText}>Jadwal Terlewat</Text>
           </View>
         ) : (
-          <TouchableOpacity style={styles.startButton} onPress={onStartPress} activeOpacity={0.85}>
+          <TouchableOpacity
+            style={[styles.startButton, startDisabled && styles.startBtnDisabled]}
+            onPress={onStartPress}
+            disabled={startDisabled}
+            activeOpacity={0.85}
+          >
             <Text style={styles.startButtonIcon}>▶</Text>
             <Text style={styles.startButtonText}>Start Training</Text>
           </TouchableOpacity>
@@ -482,6 +489,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#4CD964', borderRadius: 14, paddingVertical: 16,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
   },
+  startBtnDisabled: { backgroundColor: '#E0E0E0' },
   startButtonIcon: { fontSize: 14, color: '#1A1A2E' },
   startButtonText: { fontSize: 16, fontWeight: '700', color: '#1A1A2E', letterSpacing: 0.2 },
   completedBtn: {

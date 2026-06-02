@@ -32,9 +32,10 @@ const styles = StyleSheet.create({
   },
   sublabel: {
     fontSize: 12,
-    fontWeight: '800',
+
     color: '#111',
     letterSpacing: 0.8,
+    fontFamily:'Lexend-Bold'
   },
   label: {
     fontSize: 14,

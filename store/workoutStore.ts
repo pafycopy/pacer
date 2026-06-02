@@ -58,6 +58,7 @@ type WorkoutStore = {
   saveTrackingResult: (dateKey: string, uid: string, result: TrackingResult) => void;
   getWorkoutsByDate: (dateKey: string) => SavedWorkout[];
   getWorkoutDates: () => string[];
+  clearGeneratedWorkouts: () => void;
 };
 
 export const useWorkoutStore = create<WorkoutStore>()(
@@ -126,6 +127,21 @@ export const useWorkoutStore = create<WorkoutStore>()(
         Object.keys(get().workoutsByDate).filter(
           (key) => get().workoutsByDate[key].length > 0
         ),
+
+      clearGeneratedWorkouts: () => {
+        set((state) => {
+          const newWorkouts = { ...state.workoutsByDate };
+          Object.keys(newWorkouts).forEach((dateKey) => {
+            // Filter hanya latihan yang BUKAN hasil generate
+            newWorkouts[dateKey] = newWorkouts[dateKey].filter((w) => !w.isGenerated);
+            // Hapus key tanggal jika sudah kosong setelah filter
+            if (newWorkouts[dateKey].length === 0) {
+              delete newWorkouts[dateKey];
+            }
+          });
+          return { workoutsByDate: newWorkouts };
+        });
+      },
     }),
     {
       name: 'pacer-workout-storage', // nama key di AsyncStorage HP

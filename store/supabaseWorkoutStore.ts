@@ -39,6 +39,7 @@ type SupabaseWorkoutStore = {
   saveTrackingResult: (dateKey: string, uid: string, result: TrackingResult) => Promise<void>;
   getWorkoutsByDate: (dateKey: string) => SavedWorkout[];
   getWorkoutDates: () => string[];
+  clearGeneratedWorkouts: () => Promise<void>;
 };
 
 export const useWorkoutStore = create<SupabaseWorkoutStore>((set, get) => ({
@@ -159,4 +160,33 @@ export const useWorkoutStore = create<SupabaseWorkoutStore>((set, get) => ({
     Object.keys(get().workoutsByDate).filter(
       (key) => get().workoutsByDate[key].length > 0
     ),
+
+  clearGeneratedWorkouts: async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    // 1. Hapus dari Supabase yang memiliki isGenerated: true di dalam kolom JSONB 'data'
+    const { error } = await supabase
+      .from('workouts')
+      .delete()
+      .eq('user_id', user.id)
+      .eq('data->isGenerated', true);
+
+    if (error) {
+      console.error('Error clearing generated workouts:', error);
+      return;
+    }
+
+    // 2. Update state lokal (filter hanya yang bukan hasil generate)
+    set((state) => {
+      const next = { ...state.workoutsByDate };
+      Object.keys(next).forEach((key) => {
+        // Filter: Hanya simpan yang isGenerated-nya TIDAK bernilai true
+        next[key] = next[key].filter((w) => w.isGenerated !== true);
+        // Hapus key tanggal jika tidak ada lagi latihan di hari itu
+        if (next[key].length === 0) delete next[key];
+      });
+      return { workoutsByDate: next };
+    });
+  },
 }));

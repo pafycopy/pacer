@@ -1,17 +1,18 @@
 {
   "expo": {
-    "name": "pacer",
-    "slug": "Brecise",
+    "name": "Brecise",
+    "slug": "brecise",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "pacer",
+    "scheme": "brecise",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true
     },
     "android": {
+      "ndkVersion": "26.1.10909125",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -19,7 +20,14 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
+      ],
+      "package": "com.anonymous.Brecise"
     },
     "web": {
       "output": "static",
@@ -43,11 +51,13 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Izinkan Pacer mengakses galeri untuk foto profil.",
-          "cameraPermission": "Izinkan Pacer menggunakan kamera untuk foto profil."
+          "photosPermission": "Izinkan Brecise mengakses galeri untuk foto profil.",
+          "cameraPermission": "Izinkan Brecise menggunakan kamera untuk foto profil."
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-web-browser",
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": true,
