@@ -19,7 +19,7 @@ const Header = ({ title }: HeaderProps) => {
         activeOpacity={0.8}
       >
         <Image
-          source={{ uri: avatarUri ?? "https://i.pravatar.cc/100" }}
+          source={{ uri: avatarUri ?? 'https://www.gravatar.com/avatar/?d=mp&s=200' }}
           style={styles.avatar}
         />
       </TouchableOpacity>

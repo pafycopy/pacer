@@ -8,6 +8,7 @@ import {
 
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { router } from 'expo-router';
 
 import {
   useWorkoutStore,
@@ -158,9 +159,7 @@ const WorkoutRow = ({
   const distance =
     !isStrength &&
     workout.trackingResult?.actualDistance
-      ? `${workout.trackingResult.actualDistance.toFixed(
-          2
-        )} km`
+      ? `${workout.trackingResult.actualDistance.toFixed(2)} km`
       : null;
 
   const pace =
@@ -170,7 +169,7 @@ const WorkoutRow = ({
       : null;
 
   return (
-    <View style={styles.row}>
+    <View style={styles.card}>
       <View
         style={[
           styles.iconBox,
@@ -185,9 +184,18 @@ const WorkoutRow = ({
       </View>
 
       <View style={styles.info}>
-        <Text style={styles.workoutName}>
-          {workout.workoutName}
-        </Text>
+        <View style={styles.topRow}>
+          <Text
+            style={styles.workoutName}
+            numberOfLines={2}
+          >
+            {workout.workoutName}
+          </Text>
+
+          <Text style={styles.dateLabel}>
+            {dateLabel}
+          </Text>
+        </View>
 
         <Text style={styles.detail}>
           {isStrength
@@ -197,10 +205,6 @@ const WorkoutRow = ({
                 .join(' · ') || 'Belum ada data'}
         </Text>
       </View>
-
-      <Text style={styles.dateLabel}>
-        {dateLabel}
-      </Text>
     </View>
   );
 };
@@ -234,7 +238,7 @@ const ActivityHistoryCard = () => {
     b.dateKey.localeCompare(a.dateKey)
   );
 
-  const displayed = history.slice(0, 5);
+  const displayed = history.slice(0, 3);
 
   return (
     <View style={styles.container}>
@@ -243,15 +247,23 @@ const ActivityHistoryCard = () => {
           Activity History
         </Text>
 
-        {history.length > 5 && (
-          <TouchableOpacity>
-            <Text style={styles.viewAll}>
-              View All →
-            </Text>
-          </TouchableOpacity>
-        )}
-      </View>
+        {/* Tombol "View All" selalu muncul */}
+          <TouchableOpacity
+  style={styles.viewAllButton}
+  onPress={() => router.push('/activityhistory')}
+>
+  <Text style={styles.viewAll}>
+    Lihat Semua
+  </Text>
 
+  <Ionicons
+    name="chevron-forward"
+    size={20}
+    color="#1F2A44"
+  />
+</TouchableOpacity>
+        
+      </View>
       {displayed.length === 0 ? (
         <View style={styles.empty}>
           <Ionicons
@@ -285,78 +297,92 @@ export default ActivityHistoryCard;
 
 const styles = StyleSheet.create({
   container: {
-    marginHorizontal: 16,
-    marginVertical: 8,
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#F0F0F0',
+    marginHorizontal: 26,
+    marginTop: 8,
+    marginBottom: 16,
   },
 
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 14,
+    marginBottom: 16,
   },
 
   title: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '700',
-    color: '#1A1A1A',
+    color: '#111',
   },
+
+  viewAllButton: {
+  flexDirection: 'row',
+  alignItems: 'center',
+},
 
   viewAll: {
-    fontSize: 13,
-    color: '#2E7D32',
-    fontWeight: '500',
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#111',
   },
 
-  row: {
+  card: {
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: '#Fff',
+    borderRadius: 20,
+    padding: 16,
     marginBottom: 14,
-    gap: 12,
   },
 
   iconBox: {
     width: 44,
     height: 44,
-    borderRadius: 12,
+    borderRadius: 28,
     justifyContent: 'center',
     alignItems: 'center',
+    marginRight: 12,
   },
 
   info: {
     flex: 1,
   },
 
+  topRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 4,
+  },
+
   workoutName: {
+    flex: 1,
     fontSize: 14,
-    fontWeight: '600',
-    color: '#1A1A1A',
-    marginBottom: 2,
+    fontWeight: '700',
+    color: '#111',
+    paddingRight: 8,
   },
 
   detail: {
-    fontSize: 12,
-    color: '#888',
+    fontSize: 14,
+    color: '#666',
+    lineHeight: 20,
   },
 
   dateLabel: {
     fontSize: 12,
-    color: '#999',
+    fontWeight: '600',
+    color: '#555',
   },
 
   empty: {
     alignItems: 'center',
-    paddingVertical: 24,
-    gap: 8,
+    paddingVertical: 40,
   },
 
   emptyText: {
-    fontSize: 13,
-    color: '#bbb',
+    marginTop: 8,
+    fontSize: 14,
+    color: '#999',
   },
 });

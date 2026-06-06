@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  Modal,
 } from 'react-native';
 import { useState } from 'react';
 import { router } from 'expo-router';
@@ -27,44 +28,37 @@ const EditProfileScreen = () => {
   const [localName, setLocalName] = useState(name);
   const [localAvatar, setLocalAvatar] = useState<string | null>(avatarUri);
   const [loading, setLoading] = useState(false);
+  const [showActionSheet, setShowActionSheet] = useState(false);
 
   // ── Pilih foto ──────────────────────────────────────────────────────────────
-  const pickImage = async () => {
-    Alert.alert('Ganti Foto Profil', 'Pilih sumber foto', [
-      {
-        text: 'Kamera',
-        onPress: async () => {
-          const perm = await ImagePicker.requestCameraPermissionsAsync();
-          if (!perm.granted) {
-            Alert.alert('Izin diperlukan', 'Aktifkan izin kamera di pengaturan.');
-            return;
-          }
-          const result = await ImagePicker.launchCameraAsync({
-            allowsEditing: true,
-            aspect: [1, 1],
-            quality: 0.7,
-          });
-          if (!result.canceled) setLocalAvatar(result.assets[0].uri);
-        },
-      },
-      {
-        text: 'Galeri',
-        onPress: async () => {
-          const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-          if (!perm.granted) {
-            Alert.alert('Izin diperlukan', 'Aktifkan izin galeri di pengaturan.');
-            return;
-          }
-          const result = await ImagePicker.launchImageLibraryAsync({
-            allowsEditing: true,
-            aspect: [1, 1],
-            quality: 0.7,
-          });
-          if (!result.canceled) setLocalAvatar(result.assets[0].uri);
-        },
-      },
-      { text: 'Batal', style: 'cancel' },
-    ]);
+  const handleCamera = async () => {
+    setShowActionSheet(false);
+    const perm = await ImagePicker.requestCameraPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert('Izin diperlukan', 'Aktifkan izin kamera di pengaturan.');
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.7,
+    });
+    if (!result.canceled) setLocalAvatar(result.assets[0].uri);
+  };
+
+  const handleGallery = async () => {
+    setShowActionSheet(false);
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert('Izin diperlukan', 'Aktifkan izin galeri di pengaturan.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.7,
+    });
+    if (!result.canceled) setLocalAvatar(result.assets[0].uri);
   };
 
   // ── Simpan ──────────────────────────────────────────────────────────────────
@@ -120,17 +114,13 @@ const EditProfileScreen = () => {
           {/* Avatar */}
           <TouchableOpacity
             style={styles.avatarWrapper}
-            onPress={pickImage}
+            onPress={() => setShowActionSheet(true)}
             activeOpacity={0.85}
           >
             <Image
-              source={{ uri: localAvatar ?? 'https://i.pravatar.cc/100' }}
+              source={{ uri: localAvatar ??  'https://www.gravatar.com/avatar/?d=mp&s=200' }}
               style={styles.avatar}
             />
-            <View style={styles.cameraOverlay}>
-              <Ionicons name="camera" size={20} color="#fff" />
-              <Text style={styles.cameraText}>Ganti Foto</Text>
-            </View>
           </TouchableOpacity>
 
           {/* Form */}
@@ -161,7 +151,7 @@ const EditProfileScreen = () => {
                   style={styles.input}
                   value={city}
                   onChangeText={setCity}
-                  placeholder="Contoh: Surakarta"
+                  placeholder="Kota"
                   placeholderTextColor="#bbb"
                   maxLength={50}
                   returnKeyType="next"
@@ -178,7 +168,7 @@ const EditProfileScreen = () => {
                   style={styles.input}
                   value={country}
                   onChangeText={setCountry}
-                  placeholder="Contoh: Indonesia"
+                  placeholder="Negara"
                   placeholderTextColor="#bbb"
                   maxLength={50}
                   returnKeyType="done"
@@ -214,6 +204,48 @@ const EditProfileScreen = () => {
 
           <View style={{ height: 40 }} />
         </ScrollView>
+
+        {/* Custom Action Sheet Style Modal */}
+        <Modal
+  visible={showActionSheet}
+  transparent
+  animationType="fade"
+  onRequestClose={() => setShowActionSheet(false)}
+>
+  <TouchableOpacity
+    activeOpacity={1}
+    style={styles.modalOverlay}
+    onPress={() => setShowActionSheet(false)}
+  >
+    <TouchableOpacity
+      activeOpacity={1}
+      style={styles.modalCard}
+      onPress={(e) => e.stopPropagation()}
+    >
+      <Text style={styles.modalTitle}>
+        EDIT FOTO PROFIL
+      </Text>
+
+      <TouchableOpacity
+        style={styles.modalItem}
+        onPress={handleCamera}
+      >
+        <Text style={styles.modalItemText}>
+          Ambil Foto
+        </Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.modalItem}
+        onPress={handleGallery}
+      >
+        <Text style={styles.modalItemText}>
+          Pilih Dari Galeri
+        </Text>
+      </TouchableOpacity>
+    </TouchableOpacity>
+  </TouchableOpacity>
+</Modal>
       </View>
     </KeyboardAvoidingView>
   );
@@ -340,4 +372,37 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
   },
+  // Modal Styles
+  modalOverlay: {
+  flex: 1,
+  backgroundColor: 'rgba(0,0,0,0.35)',
+  justifyContent: 'center',
+  alignItems: 'center',
+},
+
+modalCard: {
+  width: 270,
+  backgroundColor: '#FFF',
+  borderRadius: 4,
+  paddingVertical: 12,
+  paddingHorizontal: 12,
+  elevation: 5,
+},
+
+modalTitle: {
+  fontSize: 12,
+  fontWeight: '700',
+  color: '#222',
+  letterSpacing: 1.5,
+  marginBottom: 12,
+},
+
+modalItem: {
+  paddingVertical: 8,
+},
+
+modalItemText: {
+  fontSize: 14,
+  color: '#222',
+},
 });

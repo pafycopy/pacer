@@ -16,8 +16,8 @@ type UserStore = {
 export const useUserStore = create<UserStore>()(
   persist(
     (set) => ({
-      name: 'Alex Johnson',
-      location: 'Surakarta, Indonesia',
+      name: '',
+      location: '',
       avatarUri: null,
       isPremium: false,
       setName: (name) => set({ name }),

@@ -232,24 +232,6 @@ const ProfileScreen = () => {
         {/* Activity History */}
         <ActivityHistoryCard />
 
-        {/* Reset Program */}
-        {isCompleted && (
-          <TouchableOpacity
-            style={styles.resetBtn}
-            activeOpacity={0.8}
-            onPress={handleResetProgram}
-          >
-            <Ionicons
-              name="refresh"
-              size={16}
-              color="#888"
-            />
-
-            <Text style={styles.resetText}>
-              Reset Program
-            </Text>
-          </TouchableOpacity>
-        )}
 
         {/* Logout */}
         <TouchableOpacity
@@ -499,7 +481,7 @@ const styles = StyleSheet.create({
     gap: 8,
 
     marginHorizontal: 16,
-    marginTop: 20,
+    marginTop: 10,
 
     backgroundColor: '#FFF0F0',
 

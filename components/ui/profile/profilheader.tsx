@@ -17,7 +17,7 @@ const ProfileHeader = () => {
           activeOpacity={0.85}
         >
           <Image
-            source={{ uri: avatarUri ?? 'https://i.pravatar.cc/100' }}
+            source={{ uri: avatarUri ?? 'https://www.gravatar.com/avatar/?d=mp&s=200' }}
             style={styles.avatar}
           />
           <View style={styles.editBadge}>
