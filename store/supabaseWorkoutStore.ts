@@ -104,14 +104,13 @@ export const useWorkoutStore = create<SupabaseWorkoutStore>((set, get) => ({
     }));
   },
 
-  // ✅ FIX: tambah workout_type
   updateWorkout: async (dateKey, uid, data) => {
     const { error } = await supabase
       .from('workouts')
       .update({
         data,
         workout_name: data.workoutName,
-        workout_type: data.workoutType, // ← fix
+        workout_type: data.workoutType,
       })
       .eq('uid', uid);
 
@@ -139,14 +138,13 @@ export const useWorkoutStore = create<SupabaseWorkoutStore>((set, get) => ({
     }));
   },
 
-  // ✅ FIX: increment per workout type
   saveTrackingResult: async (dateKey, uid, result) => {
     const { error } = await supabase
       .from('workouts')
       .update({
         tracking_result: result,
         status: 'completed',
-        completed_at: new Date().toISOString(), // ← pastikan kolom sudah ada di Supabase
+        completed_at: new Date().toISOString(),
       })
       .eq('uid', uid);
 
@@ -162,19 +160,18 @@ export const useWorkoutStore = create<SupabaseWorkoutStore>((set, get) => ({
         .single();
 
       if (stats) {
-        // Ambil workoutType dari local state
         const workout = get().workoutsByDate[dateKey]?.find((w) => w.uid === uid);
         const workoutType = workout?.workoutType ?? '';
 
-        // Tentukan kolom yang di-increment berdasarkan tipe
+        // Semua jenis lari → completed_runs
+        // Strength Training → completed_strength
         const typeIncrements: Record<string, object> = {
-          'Running':          { completed_runs: (stats.completed_runs ?? 0) + 1 },
-          'Easy Run':         { completed_runs: (stats.completed_runs ?? 0) + 1 },
-          'Long Run':         { completed_runs: (stats.completed_runs ?? 0) + 1 },
-          'Tempo Run':        { completed_runs: (stats.completed_runs ?? 0) + 1 },
-          'Interval Run':     { completed_runs: (stats.completed_runs ?? 0) + 1 },
-          'Strength Training':{ completed_strength: (stats.completed_strength ?? 0) + 1 },
-          'Interval':         { completed_interval: (stats.completed_interval ?? 0) + 1 },
+          'Running':           { completed_runs: (stats.completed_runs ?? 0) + 1 },
+          'Easy Run':          { completed_runs: (stats.completed_runs ?? 0) + 1 },
+          'Long Run':          { completed_runs: (stats.completed_runs ?? 0) + 1 },
+          'Tempo Run':         { completed_runs: (stats.completed_runs ?? 0) + 1 },
+          'Interval Run':      { completed_runs: (stats.completed_runs ?? 0) + 1 },
+          'Strength Training': { completed_strength: (stats.completed_strength ?? 0) + 1 },
         };
 
         const increment = typeIncrements[workoutType] ?? {};
@@ -211,7 +208,6 @@ export const useWorkoutStore = create<SupabaseWorkoutStore>((set, get) => ({
       (key) => get().workoutsByDate[key].length > 0
     ),
 
-  // ✅ FIX: JSONB filter yang benar
   clearGeneratedWorkouts: async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
@@ -220,7 +216,7 @@ export const useWorkoutStore = create<SupabaseWorkoutStore>((set, get) => ({
       .from('workouts')
       .delete()
       .eq('user_id', user.id)
-      .filter('data->>isGenerated', 'eq', 'true'); // ← fix
+      .filter('data->>isGenerated', 'eq', 'true');
 
     if (error) { console.error('Error clearing generated workouts:', error); return; }
 

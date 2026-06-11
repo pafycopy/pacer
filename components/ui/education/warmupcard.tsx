@@ -1,11 +1,12 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 type Props = {
   title: string;
   subtitle?: string;
   description: string;
+  gif?: string;
   onPressVideo?: () => void;
 };
 
@@ -13,10 +14,18 @@ export default function WarmupCard({
   title,
   subtitle,
   description,
+  gif,
   onPressVideo,
 }: Props) {
   return (
     <View style={styles.card}>
+
+      {/* GIF Display */}
+      {gif ? (
+        <View style={styles.gifContainer}>
+          <Image source={{ uri: gif }} style={styles.gifImage} resizeMode="cover" />
+        </View>
+      ) : null}
 
       {/* Title */}
       <Text style={styles.title}>{title}</Text>
@@ -29,15 +38,7 @@ export default function WarmupCard({
       {/* Description */}
       <Text style={styles.description}>{description}</Text>
 
-      {/* Show Video button — selalu tampil */}
-      <TouchableOpacity
-        style={styles.videoBtn}
-        onPress={onPressVideo}
-        activeOpacity={0.85}
-      >
-        <Ionicons name="play-circle" size={16} color="#FFF" />
-        <Text style={styles.videoBtnText}>Show Video</Text>
-      </TouchableOpacity>
+      
 
     </View>
   );
@@ -53,6 +54,18 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 2,
+  },
+  gifContainer: {
+    width: '100%',
+    height: 180,
+    borderRadius: 12,
+    backgroundColor: '#F4F4F4',
+    marginBottom: 16,
+    overflow: 'hidden',
+  },
+  gifImage: {
+    width: '100%',
+    height: '100%',
   },
   title: {
     fontSize: 20,

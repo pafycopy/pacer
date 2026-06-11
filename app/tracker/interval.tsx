@@ -8,6 +8,7 @@ import {
   Pressable, Vibration, ScrollView, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Svg, { Circle } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
 import * as Location from 'expo-location';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -29,17 +30,75 @@ type RepResult = {
   hit: boolean;
 };
 
+// ─── Full Circular Progress ───────────────────────────────────────────────
+const RING_SIZE    = 220;
+const STROKE       = 14;
+const RADIUS       = (RING_SIZE - STROKE) / 2;
+const CENTER       = RING_SIZE / 2;
+const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
+
+function CircularProgress({
+  progress,
+  color,
+  currentDist,
+  targetDist,
+}: {
+  progress: number;
+  color: string;
+  currentDist: number;
+  targetDist: number;
+}) {
+  const clamped          = Math.min(Math.max(progress, 0), 1);
+  const strokeDashoffset = CIRCUMFERENCE * (1 - clamped);
+
+  return (
+    <View style={ringStyles.wrapper}>
+      <Svg width={RING_SIZE} height={RING_SIZE}>
+        <Circle cx={CENTER} cy={CENTER} r={RADIUS}
+          stroke="#EBEBEB" strokeWidth={STROKE} fill="none" />
+        <Circle cx={CENTER} cy={CENTER} r={RADIUS}
+          stroke={color} strokeWidth={STROKE} fill="none"
+          strokeDasharray={`${CIRCUMFERENCE} ${CIRCUMFERENCE}`}
+          strokeDashoffset={strokeDashoffset}
+          strokeLinecap="round"
+          transform={`rotate(-90 ${CENTER} ${CENTER})`}
+        />
+      </Svg>
+      <View style={ringStyles.centerContent}>
+        <Text style={ringStyles.progressLabel}>
+          {currentDist.toFixed(2)} km / {targetDist} km
+        </Text>
+        <Text style={ringStyles.label}>DISTANCE</Text>
+        <Text style={[ringStyles.distanceValue, { color }]}>
+          {currentDist.toFixed(2)}
+        </Text>
+        <Text style={ringStyles.distanceUnit}>KM</Text>
+      </View>
+    </View>
+  );
+}
+
+const ringStyles = StyleSheet.create({
+  wrapper: {
+    width: RING_SIZE, height: RING_SIZE,
+    alignItems: 'center', justifyContent: 'center', alignSelf: 'center',
+  },
+  centerContent: {
+    position: 'absolute', alignItems: 'center', justifyContent: 'center',
+  },
+  progressLabel: { fontSize: 12, fontWeight: '600', color: '#999', marginBottom: 2 },
+  label:         { fontSize: 11, fontWeight: '700', color: '#AAA', letterSpacing: 1.5 },
+  distanceValue: { fontSize: 44, fontWeight: '900', lineHeight: 52, letterSpacing: -1 },
+  distanceUnit:  { fontSize: 16, fontWeight: '700', color: '#888' },
+});
+
+// ─── Main Component ───────────────────────────────────────────────────────
 export default function IntervalTracker() {
   const router = useRouter();
   const { uid, dateKey, workoutName, distance, pace, reps, restTime } =
     useLocalSearchParams<{
-      uid: string;
-      dateKey: string;
-      workoutName: string;
-      distance: string;
-      pace: string;
-      reps: string;
-      restTime: string;
+      uid: string; dateKey: string; workoutName: string;
+      distance: string; pace: string; reps: string; restTime: string;
     }>();
 
   const totalReps    = parseInt(reps ?? '1');
@@ -83,11 +142,11 @@ export default function IntervalTracker() {
     { hasOwnDoneScreen: true, onAfterSave: () => setPhase('done') },
   );
 
-  useEffect(() => { phaseRef.current        = phase;         }, [phase]);
-  useEffect(() => { repDistRef.current      = repDist;       }, [repDist]);
+  useEffect(() => { phaseRef.current         = phase;         }, [phase]);
+  useEffect(() => { repDistRef.current       = repDist;       }, [repDist]);
   useEffect(() => { repMovingTimeRef.current = repMovingTime; }, [repMovingTime]);
-  useEffect(() => { repTimeRef.current      = repTime;       }, [repTime]);
-  useEffect(() => { currentRepRef.current   = currentRep;   }, [currentRep]);
+  useEffect(() => { repTimeRef.current       = repTime;       }, [repTime]);
+  useEffect(() => { currentRepRef.current    = currentRep;   }, [currentRep]);
 
   useEffect(() => {
     if (phase === 'running' || phase === 'rest') {
@@ -274,7 +333,7 @@ export default function IntervalTracker() {
     ]);
   };
 
-  const distProgress = Math.min(repDist / targetDistKm, 1);
+  const distProgress = Math.min(repDist / (targetDistKm || 1), 1);
 
   const handleHoldStart = () => {
     if (phase !== 'running') return;
@@ -303,6 +362,8 @@ export default function IntervalTracker() {
     opacity: isHolding ? 0.6 + holdProgress.value * 0.4 : 1,
   }));
 
+  const currentPace = calcPace(repDist, repMovingTime);
+
   // ─── Done screen ──────────────────────────────────────────────────────────
   if (phase === 'done') {
     const hitCount  = repResults.filter((r) => r.hit).length;
@@ -312,28 +373,18 @@ export default function IntervalTracker() {
     return (
       <SafeAreaView style={[styles.safeArea, { backgroundColor: '#FFFFFF' }]}>
         <ScrollView contentContainerStyle={styles.doneContainer} showsVerticalScrollIndicator={false}>
-
-          {/* Trophy icon */}
-            <View style={styles.trophyWrapper}>
-              <Ionicons name="trophy" size={36} color="#5BFF7A" />
-            </View>
-
-          {/* Judul */}
+          <View style={styles.trophyWrapper}>
+            <Ionicons name="trophy" size={36} color="#5BFF7A" />
+          </View>
           <Text style={styles.doneTitle}>Workout{'\n'}Selesai!</Text>
           <Text style={styles.doneSub}>
-            {allHit
-              ? 'Semua target tercapai, kerja bagus!'
-              : `${hitCount}/${totalReps} target tercapai, terus tingkatkan!`}
+            {allHit ? 'Semua target tercapai, kerja bagus!' : `${hitCount}/${totalReps} target tercapai, terus tingkatkan!`}
           </Text>
-
-          {/* Durasi total */}
           <View style={styles.durationBox}>
             <Text style={styles.durationLabel}>DURASI TOTAL</Text>
             <Text style={styles.durationValue}>{formatTime(totalTime)}</Text>
             <Text style={styles.durationUnit}>Menit</Text>
           </View>
-
-          {/* 2 stat: jarak & rep tercapai */}
           <View style={styles.statRow}>
             <View style={styles.statBox}>
               <Text style={styles.statBoxEmoji}>📍</Text>
@@ -348,22 +399,13 @@ export default function IntervalTracker() {
               <Text style={styles.statBoxUnit}>rep</Text>
             </View>
           </View>
-
-          {/* Hasil per rep */}
           <Text style={styles.sectionTitle}>HASIL PER REPETISI</Text>
-
           {repResults.map((result) => (
-            <View key={result.rep} style={[
-              styles.repResultCard,
-              { borderLeftColor: result.hit ? '#4CD964' : '#FF3B30' },
-            ]}>
+            <View key={result.rep} style={[styles.repResultCard, { borderLeftColor: result.hit ? '#4CD964' : '#FF3B30' }]}>
               <View style={styles.repResultHeader}>
                 <Text style={styles.repResultNum}>REP {result.rep}</Text>
                 <View style={[styles.hitBadge, { backgroundColor: result.hit ? '#F0FFF4' : '#FFF5F5' }]}>
-                  <Ionicons
-                    name={result.hit ? 'checkmark-circle' : 'close-circle'}
-                    size={12} color={result.hit ? '#2E7D32' : '#FF3B30'}
-                  />
+                  <Ionicons name={result.hit ? 'checkmark-circle' : 'close-circle'} size={12} color={result.hit ? '#2E7D32' : '#FF3B30'} />
                   <Text style={[styles.hitBadgeText, { color: result.hit ? '#2E7D32' : '#FF3B30' }]}>
                     {result.hit ? 'Target Tercapai' : 'Belum Tercapai'}
                   </Text>
@@ -377,9 +419,7 @@ export default function IntervalTracker() {
                 </View>
                 <View style={styles.repResultStat}>
                   <Text style={styles.repStatLabel}>PACE</Text>
-                  <Text style={[styles.repStatValue, { color: result.hit ? '#2E7D32' : '#FF3B30' }]}>
-                    {result.pace}/km
-                  </Text>
+                  <Text style={[styles.repStatValue, { color: result.hit ? '#2E7D32' : '#FF3B30' }]}>{result.pace}/km</Text>
                   <Text style={styles.repStatTarget}>target {formatTargetPace(pace ?? '0')}/km</Text>
                 </View>
                 <View style={styles.repResultStat}>
@@ -389,11 +429,9 @@ export default function IntervalTracker() {
               </View>
             </View>
           ))}
-
           <TouchableOpacity style={styles.doneBtn} onPress={() => router.back()}>
             <Text style={styles.doneBtnText}>Kembali ke Dashboard →</Text>
           </TouchableOpacity>
-
         </ScrollView>
       </SafeAreaView>
     );
@@ -402,6 +440,7 @@ export default function IntervalTracker() {
   // ─── Running screen ───────────────────────────────────────────────────────
   return (
     <SafeAreaView style={styles.safeArea}>
+      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={handleDiscard}>
           <Ionicons name="chevron-back" size={24} color="#111" />
@@ -413,6 +452,7 @@ export default function IntervalTracker() {
         <View style={{ width: 24 }} />
       </View>
 
+      {/* Rep indicators */}
       <View style={styles.repIndicators}>
         {Array.from({ length: totalReps }).map((_, i) => {
           const done   = i < repResults.length;
@@ -428,7 +468,10 @@ export default function IntervalTracker() {
         })}
       </View>
 
-      <View style={styles.container}>
+      {/* Main content */}
+      <View style={styles.mainContent}>
+
+        {/* Rest overlay */}
         {phase === 'rest' && (
           <View style={styles.restOverlay}>
             <Text style={styles.restLabel}>ISTIRAHAT</Text>
@@ -441,51 +484,56 @@ export default function IntervalTracker() {
           </View>
         )}
 
-        <View style={styles.centerContent}>
-          <View style={styles.distProgressContainer}>
-            <View style={styles.distProgressBar}>
-              <View style={[styles.distProgressFill, { width: `${distProgress * 100}%` as any }]} />
+        {/* Phase label */}
+        <View style={styles.phaseTitleRow}>
+          <Text style={styles.phaseTitle}>
+            {phase === 'idle' ? 'Siap Mulai' : phase === 'running' ? `Rep ${currentRep}` : 'Istirahat'}
+          </Text>
+          {phase === 'running' && (
+            <View style={[styles.badge, { backgroundColor: isMovingRef.current ? '#FF9500' : '#AAA' }]}>
+              <Text style={styles.badgeText}>{isMovingRef.current ? 'TRACKING' : 'DIAM'}</Text>
             </View>
-            <Text style={styles.distProgressText}>
-              {repDist.toFixed(2)} km / {targetDistKm} km
-            </Text>
+          )}
+        </View>
+
+        {/* Circular ring */}
+        <CircularProgress
+          progress={distProgress}
+          color="#FF9500"
+          currentDist={repDist}
+          targetDist={targetDistKm}
+        />
+
+        {/* Target hint */}
+        <Text style={styles.targetHint}>
+          Target: {targetDistKm} km @ {formatTargetPace(pace ?? '0')}/km
+        </Text>
+
+        {/* Stats */}
+        <View style={styles.statsRow}>
+          <View style={styles.statCard}>
+            <Text style={styles.statLabel}>DURATION</Text>
+            <Text style={styles.statValue}>{formatTime(repTime)}</Text>
+            <Text style={styles.statSub}>MM:SS</Text>
           </View>
-
-          <Text style={styles.label}>JARAK REP INI</Text>
-          <Text style={styles.distance}>
-            {repDist.toFixed(2)}
-            <Text style={styles.unit}> km</Text>
-          </Text>
-          <Text style={styles.targetHint}>
-            Target: {targetDistKm} km @ {formatTargetPace(pace ?? '0')}/km
-          </Text>
-
-          <View style={styles.statsRow}>
-            <View style={styles.statCard}>
-              <Text style={styles.statLabel}>DURATION</Text>
-              <Text style={styles.statValue}>{formatTime(repTime)}</Text>
-              <Text style={styles.statSub}>MM:SS</Text>
-            </View>
-            <View style={styles.statCard}>
-              <Text style={styles.statLabel}>AVG PACE</Text>
-              <Text style={[
-                styles.statValue,
-                (() => {
-                  const cp = calcPace(repDist, repMovingTime);
-                  if (cp === '--:--') return {};
-                  return isPaceHit(cp) ? { color: '#2E7D32' } : { color: '#FF3B30' };
-                })(),
-              ]}>
-                {calcPace(repDist, repMovingTime)}
-              </Text>
-              <Text style={styles.statSub}>MIN/KM</Text>
-            </View>
+          <View style={styles.statCard}>
+            <Text style={styles.statLabel}>AVG PACE</Text>
+            <Text style={[
+              styles.statValue,
+              currentPace !== '--:--'
+                ? isPaceHit(currentPace) ? { color: '#2E7D32' } : { color: '#FF3B30' }
+                : {},
+            ]}>
+              {currentPace}
+            </Text>
+            <Text style={styles.statSub}>MIN/KM</Text>
           </View>
         </View>
 
-        <View>
+        {/* Buttons */}
+        <View style={styles.buttonGroup}>
           {phase === 'idle' && (
-            <TouchableOpacity style={[styles.mainBtn, { backgroundColor: '#63EA7B' }]} onPress={handleStart}>
+            <TouchableOpacity style={styles.mainBtn} onPress={handleStart}>
               <Text style={styles.mainBtnText}>MULAI INTERVAL</Text>
             </TouchableOpacity>
           )}
@@ -512,16 +560,18 @@ export default function IntervalTracker() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#F3F5F4' },
+  safeArea: { flex: 1, backgroundColor: '#FFFFFF' },
+
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 20, paddingTop: 12, paddingBottom: 8,
-    backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: '#F0F0F0',
+    paddingHorizontal: 20, paddingVertical: 10,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1, borderBottomColor: '#F0F0F0',
   },
   headerCenter: { alignItems: 'center' },
   workoutName:  { fontSize: 13, fontWeight: '800', letterSpacing: 1, color: '#111' },
   workoutSub:   { fontSize: 11, color: '#888', marginTop: 2 },
-  headerTitle:  { fontSize: 13, fontWeight: '800', letterSpacing: 1, color: '#111' },
+
   repIndicators: {
     flexDirection: 'row', gap: 6, justifyContent: 'center',
     paddingVertical: 10, backgroundColor: '#FFFFFF',
@@ -529,21 +579,54 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap', paddingHorizontal: 16,
   },
   repDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#E0E0E0' },
-  container: { flex: 1, paddingHorizontal: 20, paddingBottom: 30, justifyContent: 'space-between' },
-  centerContent: { alignItems: 'center', gap: 8, paddingTop: 16 },
-  distProgressContainer: { width: '100%', gap: 4 },
-  distProgressBar: { height: 8, backgroundColor: '#E8E8E8', borderRadius: 4, overflow: 'hidden' },
-  distProgressFill: { height: '100%', backgroundColor: '#FF9500', borderRadius: 4 },
-  distProgressText: { fontSize: 11, color: '#888', textAlign: 'right' },
-  label:    { fontSize: 13, letterSpacing: 1.5, color: '#666' },
-  distance: { fontSize: 64, fontWeight: '900', color: '#000', lineHeight: 72 },
-  unit:     { fontSize: 28, fontWeight: '700', color: '#555' },
-  targetHint: { fontSize: 12, color: '#888' },
-  statsRow: { flexDirection: 'row', gap: 12, width: '100%' },
-  statCard: { flex: 1, backgroundColor: '#F8F8F8', borderRadius: 14, paddingVertical: 16, alignItems: 'center' },
-  statLabel: { fontSize: 10, color: '#888', fontWeight: '600', letterSpacing: 1 },
-  statValue: { fontSize: 20, fontWeight: '900', color: '#000', marginTop: 4 },
-  statSub:   { fontSize: 9, color: '#AAA', marginTop: 2 },
+
+  // View biasa (bukan ScrollView) untuk layout yang rapi
+  mainContent: {
+    flex: 1,
+    paddingHorizontal: 24,
+    paddingTop: 16,
+    paddingBottom: 24,
+    justifyContent: 'space-between',
+  },
+
+  phaseTitleRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
+  },
+  phaseTitle: { fontSize: 20, fontWeight: '800', color: '#111', textAlign: 'center' },
+
+  badge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
+  badgeText: { color: '#fff', fontSize: 10, fontWeight: '700', letterSpacing: 0.8 },
+
+  targetHint: { textAlign: 'center', fontSize: 12, color: '#999', fontWeight: '500' },
+
+  statsRow: { flexDirection: 'row', gap: 12 },
+  statCard: {
+    flex: 1, backgroundColor: '#F7F7F7', borderRadius: 16,
+    paddingVertical: 16, alignItems: 'center', gap: 3,
+  },
+  statLabel: { fontSize: 11, color: '#999', fontWeight: '700', letterSpacing: 0.8 },
+  statValue: { fontSize: 22, fontWeight: '900', color: '#111' },
+  statSub:   { fontSize: 10, color: '#BBB', fontWeight: '600' },
+
+  buttonGroup:  { gap: 10 },
+  bottomHint:   { textAlign: 'center', color: '#AAA', fontSize: 12 },
+  mainBtn: {
+    borderRadius: 999, height: 56,
+    justifyContent: 'center', alignItems: 'center',
+    backgroundColor: '#63EA7B',
+  },
+  mainBtnText: { color: '#111', fontSize: 15, fontWeight: '800', letterSpacing: 1 },
+  holdBtn: {
+    height: 56, borderRadius: 999, borderWidth: 2,
+    borderColor: 'rgba(255,149,0,0.3)', backgroundColor: '#FFFFFF',
+    justifyContent: 'center', alignItems: 'center', overflow: 'hidden',
+  },
+  holdBtnFill: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: '#FF9500', borderRadius: 999,
+  },
+  holdBtnText: { color: '#FF9500', fontWeight: '700', letterSpacing: 1, fontSize: 14 },
+
   restOverlay: {
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
     backgroundColor: '#1A1A2Eee', zIndex: 99,
@@ -555,33 +638,16 @@ const styles = StyleSheet.create({
   restNext:      { fontSize: 13, color: '#FFFFFF66', marginTop: 4 },
   skipBtn:  { marginTop: 16, paddingVertical: 12, paddingHorizontal: 40, borderRadius: 30, borderWidth: 1, borderColor: '#FFFFFF44' },
   skipText: { color: '#FFFFFF', fontWeight: '700', letterSpacing: 1 },
-  mainBtn:     { borderRadius: 999, height: 58, justifyContent: 'center', alignItems: 'center' },
-  mainBtnText: { color: '#111', fontSize: 15, fontWeight: '800', letterSpacing: 1 },
-  bottomHint:  { textAlign: 'center', color: '#888', fontSize: 12, marginBottom: 12 },
-  holdBtn: {
-    height: 58, borderRadius: 999, borderWidth: 2,
-    borderColor: 'rgba(255,149,0,0.3)', backgroundColor: '#FFFFFF',
-    justifyContent: 'center', alignItems: 'center', overflow: 'hidden',
-  },
-  holdBtnFill: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#FF9500', borderRadius: 999 },
-  holdBtnText: { color: '#FF9500', fontWeight: '700', letterSpacing: 1, fontSize: 14 },
 
-  // ── Done screen ───────────────────────────────────────────────────────────
+  // Done screen
   doneContainer: { padding: 24, gap: 20, paddingBottom: 48, alignItems: 'center' },
   trophyWrapper: {
     width: 88, height: 88, borderRadius: 44,
-    backgroundColor: '#111', alignItems: 'center', justifyContent: 'center',
-    marginTop: 12,
+    backgroundColor: '#111', alignItems: 'center', justifyContent: 'center', marginTop: 12,
   },
-  doneTitle: {
-    fontSize: 36, fontWeight: '900', color: '#1A1A2E',
-    textAlign: 'center', lineHeight: 42,
-  },
-  doneSub: { fontSize: 14, color: '#888', textAlign: 'center', lineHeight: 20 },
-  durationBox: {
-    width: '100%', backgroundColor: '#F4F4F4',
-    borderRadius: 16, padding: 20, gap: 2,
-  },
+  doneTitle: { fontSize: 36, fontWeight: '900', color: '#1A1A2E', textAlign: 'center', lineHeight: 42 },
+  doneSub:   { fontSize: 14, color: '#888', textAlign: 'center', lineHeight: 20 },
+  durationBox: { width: '100%', backgroundColor: '#F4F4F4', borderRadius: 16, padding: 20, gap: 2 },
   durationLabel: { fontSize: 11, fontWeight: '700', color: '#AAA', letterSpacing: 0.8 },
   durationValue: { fontSize: 36, fontWeight: '900', color: '#1A1A2E' },
   durationUnit:  { fontSize: 14, color: '#888', fontWeight: '600' },
@@ -591,15 +657,8 @@ const styles = StyleSheet.create({
   statBoxLabel: { fontSize: 10, fontWeight: '700', color: '#AAA', letterSpacing: 0.5 },
   statBoxValue: { fontSize: 24, fontWeight: '900', color: '#1A1A2E' },
   statBoxUnit:  { fontSize: 12, color: '#888', fontWeight: '500' },
-  sectionTitle: {
-    alignSelf: 'flex-start',
-    fontSize: 11, fontWeight: '700', color: '#999', letterSpacing: 0.8,
-  },
-  repResultCard: {
-    width: '100%',
-    backgroundColor: '#F9F9F9', borderRadius: 14, padding: 14,
-    borderLeftWidth: 4, gap: 10,
-  },
+  sectionTitle: { alignSelf: 'flex-start', fontSize: 11, fontWeight: '700', color: '#999', letterSpacing: 0.8 },
+  repResultCard: { width: '100%', backgroundColor: '#F9F9F9', borderRadius: 14, padding: 14, borderLeftWidth: 4, gap: 10 },
   repResultHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   repResultNum:    { fontSize: 14, fontWeight: '800', color: '#1A1A2E' },
   hitBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
@@ -609,9 +668,6 @@ const styles = StyleSheet.create({
   repStatLabel:   { fontSize: 10, fontWeight: '600', color: '#AAA', letterSpacing: 0.5 },
   repStatValue:   { fontSize: 15, fontWeight: '800', color: '#1A1A2E' },
   repStatTarget:  { fontSize: 10, color: '#BBB' },
-  doneBtn: {
-    width: '100%', backgroundColor: '#63EA7B',
-    borderRadius: 40, paddingVertical: 16, alignItems: 'center',
-  },
+  doneBtn: { width: '100%', backgroundColor: '#63EA7B', borderRadius: 40, paddingVertical: 16, alignItems: 'center' },
   doneBtnText: { color: '#111', fontWeight: '800', fontSize: 16 },
 });

@@ -1,31 +1,42 @@
 import { View, Text, StyleSheet } from 'react-native';
-import { useWorkoutStore } from '@/store/supabaseWorkoutStore';
+import { useEffect, useState } from 'react';
+import { supabase } from '@/lib/supabase';
+
+type UserStats = {
+  total_distance_km: number;
+  completed_runs: number;
+};
 
 const StatsCard = () => {
-  const { workoutsByDate } = useWorkoutStore();
-
-  // Hitung total dari semua workout yang sudah completed
-  let totalDistance = 0;
-  let totalRuns = 0;
-
-  Object.values(workoutsByDate).forEach((workouts) => {
-    workouts.forEach((w) => {
-      if (w.status !== 'completed') return;
-
-      totalRuns += 1;
-
-      // Hanya hitung jarak nyata (actualDistance), bukan target awal
-      if (w.trackingResult?.actualDistance) {
-        totalDistance += w.trackingResult.actualDistance;
-      }
-      // Strength Training tidak punya jarak, skip
-    });
+  const [stats, setStats] = useState<UserStats>({
+    total_distance_km: 0,
+    completed_runs: 0,
   });
 
+  useEffect(() => {
+  const fetchStats = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { data, error } = await supabase
+      .from('user_stats')
+      .select('total_distance_km, completed_runs')
+      .eq('user_id', user.id)
+      .maybeSingle(); // ← ganti dari .single()
+
+    if (error) { console.error(error); return; }
+    if (data) setStats(data);
+    // Kalau data null (belum ada row), state tetap default 0
+  };
+
+  fetchStats();
+}, []);
+
+  const totalDistance = stats.total_distance_km ?? 0;
   const displayDistance =
     totalDistance >= 1000
       ? `${(totalDistance / 1000).toFixed(1)} km`
-      : `${Math.round(totalDistance)} km`;
+      : `${totalDistance.toFixed(1)} km`;
 
   return (
     <View style={styles.row}>
@@ -41,7 +52,7 @@ const StatsCard = () => {
 
       <View style={styles.card}>
         <Text style={styles.label}>TOTAL RUNS</Text>
-        <Text style={styles.value}>{totalRuns}</Text>
+        <Text style={styles.value}>{stats.completed_runs ?? 0}</Text>
       </View>
     </View>
   );

@@ -63,7 +63,7 @@ export default function StatsRow({ totalWorkout, totalDistance, dataByPeriod }: 
           <View style={styles.valueRow}>
             <Text style={styles.value}>
               {distance}
-              <Text style={styles.unit}>km</Text>
+              <Text style={styles.unit}> km</Text>
             </Text>
             <Ionicons name="walk" size={28} color="#007AFF" style={styles.icon} />
           </View>
@@ -88,13 +88,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#F0F0F0',
   },
   pillActive: {
-    backgroundColor: '#1A1A2E',
+    backgroundColor: '#6BFF8F',
   },
   pillText: {
     fontSize: 12, fontWeight: '600', color: '#888',
   },
   pillTextActive: {
-    color: '#FFFFFF',
+    color: '#191C1E',
   },
 
   container: {
@@ -118,10 +118,10 @@ const styles = StyleSheet.create({
   },
   valueRow: {
     flexDirection: 'row', alignItems: 'flex-end',
-    gap: 26, marginTop: 30,
+    gap: 12, marginTop: 32, 
   },
   value: {
-    marginHorizontal: 10, fontSize: 32, fontWeight: '800', color: '#111',
+    marginHorizontal: 12, fontSize: 32, fontWeight: '800', color: '#111',
   },
   unit: {
     fontSize: 14, fontWeight: '600', color: '#111', marginBottom: 3,

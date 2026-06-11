@@ -99,11 +99,7 @@ const WarmupScreen = ({ topic, onBack }: Props) => {
             title={lesson.title}
             subtitle={lesson.subtitle}        // "Mengapa Hal Ini Penting:"
             description={lesson.description}
-            onPressVideo={
-              lesson.video
-                ? () => console.log('Play video:', lesson.video)
-                : undefined
-            }
+            gif={lesson.gif}
           />
         ))}
 

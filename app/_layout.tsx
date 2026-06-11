@@ -41,24 +41,32 @@ export default function RootLayout() {
   // ── Handle deep link OAuth callback ──────────────────────────────────────
   useEffect(() => {
     const handleUrl = async ({ url }: { url: string }) => {
-      // Tangkap code dari URL redirect Google OAuth
-      if (url.includes('code=')) {
-        const urlObj = new URL(url);
-        const code = urlObj.searchParams.get('code');
-        if (code) {
-          // ✅ exchangeCodeForSession — API yang benar untuk v2.x
-          const { data, error } = await supabase.auth.exchangeCodeForSession(code);
-          if (data?.session) {
-            setSession(data.session);
-          }
-        }
+  if (url.includes('code=')) {
+    const urlObj = new URL(url);
+    const code = urlObj.searchParams.get('code');
+    if (code) {
+      const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+      if (data?.session) {
+        setSession(data.session);
+        router.replace('/(tabs)/dashboard'); // ← tambahkan ini
       }
-      // Tangkap access_token dari URL fragment (implicit flow)
-      if (url.includes('access_token=')) {
-        const { data } = await supabase.auth.getSession();
-        if (data?.session) setSession(data.session);
-      }
-    };
+    }
+  } else if (url.includes('access_token=')) {
+    const { data } = await supabase.auth.getSession();
+    if (data?.session) {
+      setSession(data.session);
+      router.replace('/(tabs)/dashboard'); // ← tambahkan ini
+    }
+  } else {
+    // URL kosong / tidak dikenal (brecise:///) — cek session yang mungkin sudah ada
+    const { data } = await supabase.auth.getSession();
+    if (data?.session) {
+      router.replace('/(tabs)/dashboard');
+    } else {
+      router.replace('/auth');
+    }
+  }
+};
 
     const subscription = Linking.addEventListener('url', handleUrl);
 

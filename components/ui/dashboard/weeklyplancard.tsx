@@ -23,7 +23,7 @@ export default function WeeklyPlanCard({
   milestone,
   onViewPlan,
 }: Props) {
-  const progress = completedSessions / totalSessions;
+  const progress = totalSessions > 0 ? completedSessions / totalSessions : 0;
   const strokeDashoffset = CIRCUMFERENCE * (1 - progress);
   const percent = Math.round(progress * 100);
 
@@ -63,16 +63,18 @@ export default function WeeklyPlanCard({
             Minggu {currentWeek} dari {totalWeeks}
           </Text>
           <Text style={styles.sessionLabel}>
-            Selesaikan {totalSessions - completedSessions} sesi lagi{'\n'}
-            minggu ini untuk{'\n'}mencapai milestone.
+            {totalSessions === 0 ? (
+              `Belum ada jadwal sesi\nuntuk minggu ini.`
+            ) : totalSessions - completedSessions > 0 ? (
+              `Selesaikan ${totalSessions - completedSessions} sesi lagi\nminggu ini untuk\nmencapai milestone.`
+            ) : (
+              `Hebat! Semua target sesi\nminggu ini telah selesai.\nTetap konsisten!`
+            )}
           </Text>
         </View>
       </View>
 
-      {/* Milestone label */}
-      <View style={styles.milestoneRow}>
-        <Text style={styles.milestoneText}>{milestone}</Text>
-      </View>
+     
 
       <TouchableOpacity style={styles.btn} onPress={onViewPlan} activeOpacity={0.85}>
         <Text style={styles.btnText}>Lihat Plan</Text>
@@ -87,6 +89,7 @@ const styles = StyleSheet.create({
     borderRadius: 20, padding: 20, gap: 14,
     shadowColor: '#000', shadowOpacity: 0.05,
     shadowRadius: 10, elevation: 2,
+    marginHorizontal: 32,
   },
   title: { fontSize: 16, fontWeight: '800', color: '#111' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 16 },

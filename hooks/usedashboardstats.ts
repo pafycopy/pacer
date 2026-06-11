@@ -1,7 +1,6 @@
 import { useMemo } from 'react';
 import { useWorkoutStore } from '@/store/supabaseWorkoutStore';
 
-// ── Tipe Activity untuk RecentActivityCard ───────────────────────────────
 export type Activity = {
   id: string;
   workoutType: string;
@@ -11,7 +10,6 @@ export type Activity = {
   statSub?: string;
 };
 
-// ── Helper format tanggal ─────────────────────────────────────────────────
 const formatLabel = (dateKey: string): string => {
   const date = new Date(dateKey);
   const today = new Date();
@@ -22,9 +20,6 @@ const formatLabel = (dateKey: string): string => {
   return date.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
 };
 
-// ── Tips harian — rotasi setiap hari ─────────────────────────────────────
-// topicId sesuai educationData:
-// 1 = Teknik Berlari, 2 = Pencegahan Cedera, 3 = Pemanasan & Pendinginan, 4 = Latihan Kekuatan
 const TIPS = [
   { id: 1, topicId: 3, title: 'High Knees', icon: 'walk', iconBg: '#DDFFE2',
     description: 'Mengaktifkan otot fleksor pinggul dan bokong, serta melatih postur angkatan kaki yang ideal saat berlari.' },
@@ -44,7 +39,6 @@ const TIPS = [
     description: 'Core yang kuat menjaga postur lari tetap stabil dan mengurangi risiko cedera punggung bawah.' },
 ];
 
-// ── Helper hitung awal minggu (Senin) ────────────────────────────────────
 const getWeekStart = (): Date => {
   const d = new Date();
   d.setHours(0, 0, 0, 0);
@@ -61,7 +55,6 @@ const getMonthStart = (): Date => {
 
 const getYearStart = (): Date => new Date(new Date().getFullYear(), 0, 1);
 
-// ─────────────────────────────────────────────────────────────────────────
 export const useDashboardStats = () => {
   const { workoutsByDate } = useWorkoutStore();
 
@@ -72,7 +65,6 @@ export const useDashboardStats = () => {
     const monthStart = getMonthStart();
     const yearStart  = getYearStart();
 
-    // ── Akumulasi stats ───────────────────────────────────────────────────
     const dataByPeriod = {
       hari:   { workout: 0, distance: 0 },
       minggu: { workout: 0, distance: 0 },
@@ -82,21 +74,54 @@ export const useDashboardStats = () => {
 
     let totalPlannedWeek = 0;
     let completedWeek = 0;
-
     const recentActivities: Activity[] = [];
+
+    // ✅ Cek ada plan aktif
+    const hasActivePlan = Object.values(workoutsByDate).some((dayWorkouts) =>
+      dayWorkouts.some((w) => w.isGenerated === true)
+    );
+
+    // ✅ Hitung programStartDate dari generated workout pertama
+    let programStartDate: Date | null = null;
+    if (hasActivePlan) {
+      const generatedDateKeys = Object.entries(workoutsByDate)
+        .filter(([, workouts]) => workouts.some((w) => w.isGenerated === true))
+        .map(([dateKey]) => dateKey)
+        .sort();
+      if (generatedDateKeys.length > 0) {
+        programStartDate = new Date(generatedDateKeys[0]);
+        programStartDate.setHours(0, 0, 0, 0);
+      }
+    }
+
+    // ✅ currentWeek dari program, bukan kalender
+    const currentWeek = programStartDate
+      ? Math.min(Math.max(Math.ceil(
+          (today.getTime() - programStartDate.getTime()) /
+          (7 * 24 * 60 * 60 * 1000)
+        ), 1), 4)
+      : 1;
+
+    // ✅ Range minggu program yang sedang berjalan
+    const programWeekStart = programStartDate
+      ? new Date(programStartDate.getTime() + (currentWeek - 1) * 7 * 24 * 60 * 60 * 1000)
+      : weekStart;
+    const programWeekEnd = new Date(programWeekStart.getTime() + 7 * 24 * 60 * 60 * 1000);
 
     Object.entries(workoutsByDate).forEach(([dateKey, workouts]) => {
       const date = new Date(dateKey);
       date.setHours(0, 0, 0, 0);
 
-      const isToday  = date.getTime() === today.getTime();
-      const isWeek   = date >= weekStart;
-      const isMonth  = date >= monthStart;
-      const isYear   = date >= yearStart;
+      const isToday        = date.getTime() === today.getTime();
+      const isWeek         = date >= weekStart;
+      const isMonth        = date >= monthStart;
+      const isYear         = date >= yearStart;
+      // ✅ Apakah tanggal ini masuk minggu program saat ini
+      const isProgramWeek  = date >= programWeekStart && date < programWeekEnd;
 
       workouts.forEach((w) => {
-        // Planned minggu ini (untuk weekly plan)
-        if (isWeek) {
+        // ✅ Hitung sesi dari minggu program, bukan kalender
+        if (isProgramWeek && w.isGenerated === true) {
           totalPlannedWeek += 1;
           if (w.status === 'completed') completedWeek += 1;
         }
@@ -105,15 +130,16 @@ export const useDashboardStats = () => {
 
         const dist = w.trackingResult?.actualDistance ?? 0;
 
-        if (isToday)  { dataByPeriod.hari.workout++;   dataByPeriod.hari.distance += dist; }
-        if (isWeek)   { dataByPeriod.minggu.workout++;  dataByPeriod.minggu.distance += dist; }
-        if (isMonth)  { dataByPeriod.bulan.workout++;   dataByPeriod.bulan.distance += dist; }
-        if (isYear)   { dataByPeriod.tahun.workout++;   dataByPeriod.tahun.distance += dist; }
+        if (isToday) { dataByPeriod.hari.workout++;   dataByPeriod.hari.distance += dist; }
+        if (isWeek)  { dataByPeriod.minggu.workout++;  dataByPeriod.minggu.distance += dist; }
+        if (isMonth) { dataByPeriod.bulan.workout++;   dataByPeriod.bulan.distance += dist; }
+        if (isYear)  { dataByPeriod.tahun.workout++;   dataByPeriod.tahun.distance += dist; }
 
-        // Recent activities
         const isStrength = w.workoutType === 'Strength Training';
         const exerciseCount = w.selectedExercises?.length ?? 0;
-        const totalSets = w.selectedExercises?.reduce((acc, ex) => acc + (ex.sets?.length ?? 0), 0) ?? 0;
+        const totalSets = w.selectedExercises?.reduce(
+          (acc, ex) => acc + (ex.sets?.length ?? 0), 0
+        ) ?? 0;
 
         const stat = isStrength
           ? `${exerciseCount} exercise`
@@ -136,39 +162,34 @@ export const useDashboardStats = () => {
       });
     });
 
-    // Bulatkan jarak
     Object.keys(dataByPeriod).forEach((k) => {
       const key = k as keyof typeof dataByPeriod;
       dataByPeriod[key].distance = Math.round(dataByPeriod[key].distance * 10) / 10;
     });
 
-    // Urutkan terbaru, ambil 5
     recentActivities.sort((a, b) => b.id.localeCompare(a.id));
     const displayed = recentActivities.slice(0, 5);
 
-    // ── Konsistensi ───────────────────────────────────────────────────────
     const consistencyPercent = totalPlannedWeek > 0
       ? Math.round((completedWeek / totalPlannedWeek) * 100)
       : 0;
 
     const consistencyMsg =
-      consistencyPercent >= 80 ? `Kamu sudah ${consistencyPercent}% konsisten minggu ini! Pertahankan ritmenya.`
-      : consistencyPercent >= 50 ? `Kamu ${consistencyPercent}% konsisten minggu ini. Ayo tingkatkan!`
-      : 'Mulai rencanakan latihan minggu ini untuk membangun konsistensi.';
+      consistencyPercent >= 80
+        ? `Kamu sudah ${consistencyPercent}% konsisten minggu ini! Pertahankan ritmenya.`
+        : consistencyPercent >= 50
+        ? `Kamu ${consistencyPercent}% konsisten minggu ini. Ayo tingkatkan!`
+        : 'Mulai rencanakan latihan minggu ini untuk membangun konsistensi.';
 
-    // ── Weekly plan ───────────────────────────────────────────────────────
-    const weekNum = Math.ceil((today.getDate()) / 7);
-    const currentWeek = Math.min(weekNum, 4);
-
-    // ── Weekly label ─────────────────────────────────────────────────────
     const weeklyLabel =
       dataByPeriod.minggu.workout >= 5 ? 'Luar Biasa! 🔥'
       : dataByPeriod.minggu.workout >= 3 ? 'Bagus!'
       : dataByPeriod.minggu.workout >= 1 ? 'Mulai Bagus'
       : 'Ayo Mulai';
 
-    // ── Tips hari ini (rotasi harian) ─────────────────────────────────────
-    const dayOfYear = Math.floor((today.getTime() - new Date(today.getFullYear(), 0, 0).getTime()) / 86400000);
+    const dayOfYear = Math.floor(
+      (today.getTime() - new Date(today.getFullYear(), 0, 0).getTime()) / 86400000
+    );
     const tip = TIPS[dayOfYear % TIPS.length];
 
     return {
@@ -176,8 +197,9 @@ export const useDashboardStats = () => {
       consistencyPercent,
       consistencyMsg,
       completedSessions: completedWeek,
-      totalSessions: Math.max(totalPlannedWeek, 1),
+      totalSessions: totalPlannedWeek,
       currentWeek,
+      hasActivePlan,
       recentActivities: displayed,
       weeklyLabel,
       tip,

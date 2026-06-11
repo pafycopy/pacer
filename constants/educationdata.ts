@@ -1,3 +1,5 @@
+const BASE = 'https://edbesyritkmfadbstswd.supabase.co/storage/v1/object/public/gifs';
+
 export type LessonDetail = {
   karakteristik?: string[];
   pemicu?: string[];
@@ -290,14 +292,16 @@ export const educationData: EducationTopic[] = [
         description: 'Mengaktifkan otot fleksor pinggul dan bokong (glutes), serta melatih postur angkatan kaki yang ideal saat berlari.',
         hasDetail: false,
         type: 'warmup',
+        gif: `${BASE}/education/pemanasan_pendinginan/pemanasan/High%20Knees.gif`,
       },
      {
         id: 2,
-        title: 'Butt Kiks',
+        title: 'Butt Kicks',
         subtitle: 'Mengapa Hal Ini Penting:',
         description: 'Memanaskan otot paha belakang (hamstrings) secara aktif dan meningkatkan kelincahan langkah kaki.',
         hasDetail: false,
         type: 'warmup',
+        gif: `${BASE}/education/pemanasan_pendinginan/pemanasan/Butt%20Kicks.gif`,
       },
       {
         id: 3,
@@ -306,6 +310,7 @@ export const educationData: EducationTopic[] = [
         description: 'Membuka mobilitas sendi pinggul agar jangkauan langkah (stride) lebih leluasa dan tidak kaku.',
         hasDetail: false,
         type: 'warmup',
+        gif: `${BASE}/education/mobilitas/Leg%20Swing.gif`,
       },
       {
         id: 4,
@@ -314,6 +319,7 @@ export const educationData: EducationTopic[] = [
         description: 'Membangunkan kelompok otot besar (paha depan, paha belakang, dan bokong) sekaligus melatih keseimbangan tubuh.',
         hasDetail: false,
         type: 'warmup',
+        gif: `${BASE}/education/pemanasan_pendinginan/pemanasan/Walking%20Lunges.gif`,
       },
       {
         id: 5,
@@ -322,46 +328,52 @@ export const educationData: EducationTopic[] = [
         description: 'Gerakan kardio menyeluruh untuk menaikkan detak jantung dengan cepat dan menyelaraskan koordinasi tubuh.',
         hasDetail: false,
         type: 'warmup',
+        gif: `${BASE}/education/pemanasan_pendinginan/pemanasan/Jumping%20Jack.gif`,
       },
       {
         id: 6,
-        title: 'Hamstring streach',
+        title: 'Hamstring Stretch',
         subtitle: 'Mengapa Hal Ini Penting:',
-        description: 'Mengaktifkan otot fleksor pinggul dan bokong (glutes), serta melatih postur angkatan kaki yang ideal saat berlari.',
+        description: 'Membantu merelaksasi otot paha belakang setelah kontraksi berulang saat berlari, mencegah kekakuan otot.',
         hasDetail: false,
         type: 'cooldown',
+        gif: `${BASE}/education/pemanasan_pendinginan/pendinginan/Hamstring%20Stretch.gif`,
       },
      {
         id: 7,
-        title: 'Butt Kiks',
+        title: 'Quad Stretch',
         subtitle: 'Mengapa Hal Ini Penting:',
         description: 'Memanaskan otot paha belakang (hamstrings) secara aktif dan meningkatkan kelincahan langkah kaki.',
         hasDetail: false,
         type: 'cooldown',
+        gif: `${BASE}/education/pemanasan_pendinginan/pendinginan/Quad%20Stretch.gif`,
       },
       {
         id: 8,
-        title: 'Leg Swings',
+        title: 'Calf Stretch',
         subtitle: 'Mengapa Hal Ini Penting:',
         description: 'Membuka mobilitas sendi pinggul agar jangkauan langkah (stride) lebih leluasa dan tidak kaku.',
         hasDetail: false,
         type: 'cooldown',
+        gif: `${BASE}/education/pemanasan_pendinginan/pendinginan/Calf%20Stretch.gif`,
       },
       {
         id: 9,
-        title: 'Walking Lunges',
+        title: 'Cross-Body Shoulder Stretch',
         subtitle: 'Mengapa Hal Ini Penting:',
         description: 'Membangunkan kelompok otot besar (paha depan, paha belakang, dan bokong) sekaligus melatih keseimbangan tubuh.',
         hasDetail: false,
         type: 'cooldown',
+        gif: `${BASE}/education/pemanasan_pendinginan/pendinginan/Cross-Body%20Shoulder%20Stretch.gif`,
       },
       {
         id: 10,
-        title: 'Jumping Jack',
+        title: 'Child Pose',
         subtitle: 'Mengapa Hal Ini Penting:',
         description: 'Gerakan kardio menyeluruh untuk menaikkan detak jantung dengan cepat dan menyelaraskan koordinasi tubuh.',
         hasDetail: false,
         type: 'cooldown',
+        gif: `${BASE}/education/pemanasan_pendinginan/pendinginan/Child%20Pose.gif`,
       },
     ],
   },

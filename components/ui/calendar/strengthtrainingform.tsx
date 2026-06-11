@@ -266,7 +266,6 @@ export default function StrengthTrainingForm({ initialValues, onBack, onSave }: 
   const handleStart = () => { if (pendingValues) onSave(pendingValues); };
 
   // ── Preview screen ─────────────────────────────────────────────────────────
-  // ── Preview screen ─────────────────────────────────────────────────────────
   if (showPreview && pendingValues) {
     const estimateMins = Math.round(totalSets * 1.5);
     const previewExercises: PreviewExercise[] = selectedExercises.map((e) => ({
@@ -324,7 +323,7 @@ export default function StrengthTrainingForm({ initialValues, onBack, onSave }: 
                   {(() => {
                     const IconComp = CATEGORY_ICONS[cat];
                     return IconComp ? (
-                      <IconComp size={16} color={active ? '#fff' : cfg.color} />
+                      <IconComp size={16} color={cfg.color} />
                     ) : null;
                   })()}
                   <Text style={[fs.contextLabel, active && fs.contextLabelActive]}>{cat}</Text>

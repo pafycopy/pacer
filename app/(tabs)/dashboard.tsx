@@ -24,14 +24,15 @@ const Dashboard = () => {
     completedSessions,
     totalSessions,
     currentWeek,
+    hasActivePlan, // ✅
     recentActivities,
     weeklyLabel,
     tip,
   } = useDashboardStats();
 
   const handleTipPress = () => {
-    openTopic(tip.topicId);          // set sinyal ke store dulu
-    router.navigate('/(tabs)/education' as any); // lalu pindah tab
+    openTopic(tip.topicId);
+    router.navigate('/(tabs)/education' as any);
   };
 
   return (
@@ -44,19 +45,23 @@ const Dashboard = () => {
       >
         <TipsCard tip={tip} onPress={handleTipPress} />
 
-        <MonitoringProgress
-          consistencyPercent={consistencyPercent}
-          message={consistencyMsg}
-        />
-
-        <WeeklyPlanCard
-          currentWeek={currentWeek}
-          totalWeeks={4}
-          completedSessions={completedSessions}
-          totalSessions={totalSessions}
-          milestone={`Minggu ${currentWeek} dari 4`}
-          onViewPlan={() => router.push('/(tabs)/training')}
-        />
+        {/* ✅ Hanya tampil kalau sudah ada plan */}
+        {hasActivePlan && (
+          <>
+            <MonitoringProgress
+              consistencyPercent={consistencyPercent}
+              message={consistencyMsg}
+            />
+            <WeeklyPlanCard
+              currentWeek={currentWeek}
+              totalWeeks={4}
+              completedSessions={completedSessions}
+              totalSessions={totalSessions}
+              milestone={`Minggu ${currentWeek} dari 4`}
+              onViewPlan={() => router.push('/(tabs)/training')}
+            />
+          </>
+        )}
 
         <StatsRow
           totalWorkout={dataByPeriod.minggu.workout}
